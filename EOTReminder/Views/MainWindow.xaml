@@ -155,12 +155,12 @@
                 <Viewbox Grid.Column="0">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <Viewbox MaxHeight="40">
-                            <!-- Increased MaxHeight for larger text/icons -->
-                            <TextBlock Text="נץ החמה" FontSize="12"/>
+                            <!-- Increased MaxHeight -->
+                            <TextBlock Text="שקיעה" FontSize="12"/>
                         </Viewbox>
                         <Viewbox MaxHeight="50">
                             <!-- Increased MaxHeight -->
-                            <TextBlock Text="{Binding Sunrise}" FontSize="12" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding Sunset}" FontSize="12" FontWeight="Bold"/>
                         </Viewbox>
                     </StackPanel>
                 </Viewbox>
@@ -184,15 +184,14 @@
                     <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
                 </Viewbox>
                 <Viewbox Grid.Column="4">
-                    <!-- Double size -->
-                    <StackPanel Grid.Column="4" Orientation="Vertical" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <Viewbox MaxHeight="40">
-                            <!-- Increased MaxHeight -->
-                            <TextBlock Text="שקיעה" FontSize="12"/>
+                            <!-- Increased MaxHeight for larger text/icons -->
+                            <TextBlock Text="נץ החמה" FontSize="12"/>
                         </Viewbox>
                         <Viewbox MaxHeight="50">
                             <!-- Increased MaxHeight -->
-                            <TextBlock Text="{Binding Sunset}" FontSize="12" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding Sunrise}" FontSize="12" FontWeight="Bold"/>
                         </Viewbox>
                     </StackPanel>
                 </Viewbox>
@@ -272,12 +271,13 @@
                                 </Grid.ColumnDefinitions>
                                 <Viewbox Grid.Column="0" HorizontalAlignment="Right">
                                     <Image Width="150"  Height="450"
-                                           Source="{Binding Converter={StaticResource  ImageResourceConverter}, ConverterParameter=SandClock}"
+                                           Source="/Assets/sandclock.png"
                                            Margin="0"
                                            VerticalAlignment="Center"
                                            Visibility="Visible"
                                            Stretch="Uniform"/>
                                 </Viewbox>
+                                <!-- Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=SandClock}" -->
                                 <!-- Visibility="{Binding ShowSandClock, Converter={StaticResource BoolToVisibility}}" -->
                                 <Border Grid.Column="1" Margin="0,0,0,8"
                                     Style="{StaticResource BigTimeBoxStyle}" 

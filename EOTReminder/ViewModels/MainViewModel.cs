@@ -1,20 +1,20 @@
 ﻿using EOTReminder.Models;
 using EOTReminder.Utilities;
+using ExcelDataReader; // Ensure this NuGet package is installed
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Media;
+using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Timers;
-using ExcelDataReader; // Ensure this NuGet package is installed
-using System.Collections.Generic;
 using System.Text;
-using System.Data;
-using System.Net;
+using System.Timers;
 using System.Windows; // For Application.Current.Dispatcher.Invoke and MessageBox
 
 namespace EOTReminder.ViewModels
@@ -29,6 +29,10 @@ namespace EOTReminder.ViewModels
         public ObservableCollection<TimeSlot> BottomSlots { get; } = new ObservableCollection<TimeSlot>();
 
         private bool _isAlertActive;
+        private DateTime _lastExcelReloadDate = DateTime.MinValue;
+        private bool _hasReloadedForCurrentSunriseCycle = false;
+        // Stores the sunrise time for which data is currently loaded
+        private DateTime _currentSunriseForReloadCheck = DateTime.MinValue;
 
         public bool IsAlertActive // Controls visibility of normal 2x2 grid vs. alert layout
         {
@@ -84,18 +88,18 @@ namespace EOTReminder.ViewModels
             {
                 ["en"] = new Dictionary<string, string>()
                 {
-                    ["EOS1"] = "End of Shema 1", // Added numbers for clarity
-                    ["EOS2"] = "End of Shema 2",
-                    ["EOT1"] = "End of Prayer 1",
-                    ["EOT2"] = "End of Prayer 2",
+                    ["a2EOS1"] = "End of Shema 1", // Added numbers for clarity
+                    ["a1EOS2"] = "End of Shema 2",
+                    ["b2EOT1"] = "End of Prayer 1",
+                    ["b1EOT2"] = "End of Prayer 2",
                     ["Passed"] = "Passed"
                 },
                 ["he"] = new Dictionary<string, string>()
                 {
-                    ["EOS1"] = "סו\"ז קר\"ש מג\"א",
-                    ["EOS2"] = "סו\"ז קר\"ש תניא גר\"א",
-                    ["EOT1"] = "סו\"ז תפילה מג\"א",
-                    ["EOT2"] = "סו\"ז תפילה תניא גר\"א",
+                    ["a2EOS1"] = "סו\"ז קר\"ש מג\"א",
+                    ["a1EOS2"] = "סו\"ז קר\"ש תניא גר\"א",
+                    ["b2EOT1"] = "סו\"ז תפילה מג\"א",
+                    ["b1EOT2"] = "סו\"ז תפילה תניא גר\"א",
                     ["Passed"] = "עבר זמנו", // Corrected key to "Passed"
                 }
             };
@@ -124,6 +128,10 @@ namespace EOTReminder.ViewModels
                     {
                         slot.Countdown = slot.Time - DateTime.Now; // Update countdown
 
+                        int firstAlertMin = Properties.Settings.Default.FirstAlertMinutes;
+                        int secondAlertMin = Properties.Settings.Default.SecondAlertMinutes;
+                        int visualAlertMin = Properties.Settings.Default.VisualAlertMinutes;
+
                         if (!slot.IsPassed && slot.Countdown <= TimeSpan.Zero)
                         {
                             // Time has just passed
@@ -142,7 +150,7 @@ namespace EOTReminder.ViewModels
                         else if (!slot.IsPassed)
                         {
                             // Time is still upcoming
-                            if (slot.Countdown.TotalMinutes <= 30 && !slot.AlertFlags["30"])
+                            if (slot.Countdown.TotalMinutes <= visualAlertMin && !slot.AlertFlags["30"])
                             {
                                 IsAlertActive = true;
                                 // 30-minute alert trigger
@@ -152,7 +160,7 @@ namespace EOTReminder.ViewModels
                                 slot.AlertFlags["30"] = true;
                                 // No MessageBox for 30min visual alert, just the UI change
                             }
-                            else if (slot.Countdown.TotalMinutes > 30 && slot.AlertFlags["30"])
+                            else if (slot.Countdown.TotalMinutes > visualAlertMin && slot.AlertFlags["30"])
                             {
                                 IsAlertActive = false;
                                 // If it was in 30min alert but now it's outside, reset
@@ -168,9 +176,9 @@ namespace EOTReminder.ViewModels
                                 slot.Countdown.Seconds);
 
                             // NEW: Lines 142-152 - Use settings for alert thresholds
-                            if (Properties.Settings.Default.FirstAlertMinutes > 0 &&
-                                slot.Countdown.TotalMinutes <= Properties.Settings.Default.FirstAlertMinutes &&
-                                slot.Countdown.TotalMinutes > (Properties.Settings.Default.FirstAlertMinutes - 1) && // Ensure it fires once per minute
+                            if (firstAlertMin > 0 &&
+                                slot.Countdown.TotalMinutes <= firstAlertMin &&
+                                slot.Countdown.TotalMinutes > (firstAlertMin - 1) && // Ensure it fires once per minute
                                 !slot.AlertFlags["10"])
                             {
                                 if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
@@ -178,15 +186,44 @@ namespace EOTReminder.ViewModels
                                 slot.AlertFlags["10"] = true;
                             }
 
-                            if (Properties.Settings.Default.SecondAlertMinutes > 0 &&
-                                slot.Countdown.TotalMinutes <= Properties.Settings.Default.SecondAlertMinutes &&
-                                slot.Countdown.TotalMinutes > (Properties.Settings.Default.SecondAlertMinutes - 1) && // Ensure it fires once per minute
+                            if (secondAlertMin > 0 &&
+                                slot.Countdown.TotalMinutes <= secondAlertMin &&
+                                slot.Countdown.TotalMinutes > (secondAlertMin - 1) && // Ensure it fires once per minute
                                 !slot.AlertFlags["3"])
                             {
                                 if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
                                    PlayAlert(slot.Id, "3"); // Still pass "3" to choose the WAV file
                                 
                                 slot.AlertFlags["3"] = true;
+                            }
+
+                            // Step 1: Ensure _internalSunriseTime is always updated for the current Gregorian day.
+                            // This is crucial if the application runs continuously past midnight,
+                            // as _internalSunriseTime would otherwise remain from the previous day.
+                            if (_internalSunriseTime.Date != DateTime.Today)
+                            {
+                                // It's a new Gregorian day, or _internalSunriseTime hasn't been updated for today yet.
+                                // Reload Excel data to get the correct sunrise time for today.
+                                _hasReloadedForCurrentSunriseCycle = false; // Reset the flag for the new day's cycle
+                                _currentSunriseForReloadCheck = _internalSunriseTime; // Store this sunrise time as the basis for the current cycle
+                                Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
+                            }
+
+                            // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
+                            // Step 2: Calculate the specific reload trigger time for today's sunrise.
+                            DateTime reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
+
+                            // Step 3: Check if it's time to perform the scheduled daily reload (72 minutes before sunrise).
+                            // This condition ensures:
+                            // 1. The current time is past the calculated trigger time.
+                            // 2. We haven't already reloaded for *this specific sunrise cycle*.
+                            //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
+                            if (DateTime.Now >= reloadTriggerTime && !_hasReloadedForCurrentSunriseCycle)
+                            {
+                                Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {reloadTriggerTime:HH:mm:ss}");
+                                LoadFromExcel(); // Perform the actual scheduled reload
+                                _hasReloadedForCurrentSunriseCycle = true; // Mark that reload has happened for this cycle
+                                _currentSunriseForReloadCheck = _internalSunriseTime; // Update the marker to the new sunrise time after reload
                             }
                         }
                     }
@@ -316,12 +353,13 @@ namespace EOTReminder.ViewModels
                         TimeSlots.Clear();
 
                         // Add EOS/EOT slots
-                        AddSlot("EOS1", ParseTimeFromCell(todayRow, "EOS1"));
-                        AddSlot("EOS2", ParseTimeFromCell(todayRow, "EOS2"));
-                        AddSlot("EOT1", ParseTimeFromCell(todayRow, "EOT1"));
-                        AddSlot("EOT2", ParseTimeFromCell(todayRow, "EOT2"));
+                        AddSlot("a1EOS2", ParseTimeFromCell(todayRow, "EOS2"));
+                        AddSlot("a2EOS1", ParseTimeFromCell(todayRow, "EOS1"));
+                        AddSlot("b1EOT2", ParseTimeFromCell(todayRow, "EOT2"));
+                        AddSlot("b2EOT1", ParseTimeFromCell(todayRow, "EOT1"));
 
-                        TimeSlots.OrderByDescending(s => s.Id);
+                        TimeSlots.OrderBy(s => s.Id);
+                        //TimeSlots = TimeSlots.Reverse();
 
                         // Set special times to internal DateTime fields
                         _internalSunriseTime = ParseTimeFromCell(todayRow, "Sunrise");
@@ -373,15 +411,15 @@ namespace EOTReminder.ViewModels
         {
             TimeSlots.Clear(); // Clear existing slots before adding mock data
             var now = DateTime.Now;
-            AddSlot("EOS1", now.AddMinutes(5).AddSeconds(1));
-            AddSlot("EOS2", now.AddMinutes(10).AddSeconds(1));
-            AddSlot("EOT1", now.AddMinutes(20).AddSeconds(1));
-            AddSlot("EOT2", now.AddMinutes(30).AddSeconds(1));
+            AddSlot("a2EOS1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+            AddSlot("a1EOS2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+            AddSlot("b2EOT1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+            AddSlot("b1EOT2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
 
             // Set internal DateTime fields for mock data
-            _internalSunriseTime = now.Date.AddHours(6).AddMinutes(0);
-            _internalMiddayTime = now.Date.AddHours(12).AddMinutes(0);
-            _internalSunsetTime = now.Date.AddHours(19).AddMinutes(30);
+            _internalSunriseTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
+            _internalMiddayTime =  DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
+            _internalSunsetTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
 
             HebrewDate = GetHebrewJewishDateString(now, false);
 
@@ -414,19 +452,19 @@ namespace EOTReminder.ViewModels
             // Option 1: Play from embedded resource (preferred)
             string fileName = String.Empty;
             string extFileName = String.Empty;
-            if (slotId == "EOS1" &&
+            if (slotId == "a2EOS1" &&
                 minutesBefore == Properties.Settings.Default.FirstAlertMinutes.ToString() &&
                 !string.IsNullOrEmpty(Properties.Settings.Default.EOS1FirstAlertPath))
                 extFileName = Properties.Settings.Default.EOS1FirstAlertPath;
-            else if (slotId == "EOS1" &&
+            else if (slotId == "a2EOS1" &&
                      minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
                      !string.IsNullOrEmpty(Properties.Settings.Default.EOS1SecondAlertPath))
                 extFileName = Properties.Settings.Default.EOS1SecondAlertPath;
-            else if (slotId == "EOS2" &&
+            else if (slotId == "a1EOS2" &&
                      minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
                      !string.IsNullOrEmpty(Properties.Settings.Default.EOS2FirstAlertPath))
                 extFileName = Properties.Settings.Default.EOS2FirstAlertPath;
-            else if (slotId == "EOS2" &&
+            else if (slotId == "a1EOS2" &&
                      minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
                      !string.IsNullOrEmpty(Properties.Settings.Default.EOS2SecondAlertPath))
                 extFileName = Properties.Settings.Default.EOS2SecondAlertPath;
@@ -473,14 +511,20 @@ namespace EOTReminder.ViewModels
             TopSlots.Clear();
             BottomSlots.Clear();
 
+            ObservableCollection<TimeSlot> temp = new ObservableCollection<TimeSlot>();
             if (alertSlot != null)
             {
                 IsAlertActive = true; // Activate alert UI layout
                 TopSlots.Add(alertSlot);
-                foreach (var slot in TimeSlots.Where(s => s != alertSlot).OrderByDescending(s => s.Time)) // Order remaining slots
+                foreach (var slot in TimeSlots.Where(s => s != alertSlot)) // Order remaining slots
+                {
+                    temp.Add(slot);
+                }
+                foreach (var slot in temp.OrderByDescending(s => s.Time))
                 {
                     BottomSlots.Add(slot);
                 }
+                //BottomSlots.Concat(temp.OrderByDescending(s => s.Time));
             }
             else
             {

@@ -19,7 +19,7 @@ namespace EOTReminder.Properties {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Resources {
@@ -63,36 +63,36 @@ namespace EOTReminder.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alertEOS1_10 {
+        internal static System.IO.UnmanagedMemoryStream alerta1EOS2_10 {
             get {
-                return ResourceManager.GetStream("alertEOS1_10", resourceCulture);
+                return ResourceManager.GetStream("alerta1EOS2_10", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alertEOS1_3 {
+        internal static System.IO.UnmanagedMemoryStream alerta1EOS2_3 {
             get {
-                return ResourceManager.GetStream("alertEOS1_3", resourceCulture);
+                return ResourceManager.GetStream("alerta1EOS2_3", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alertEOS2_10 {
+        internal static System.IO.UnmanagedMemoryStream alerta2EOS1_10 {
             get {
-                return ResourceManager.GetStream("alertEOS2_10", resourceCulture);
+                return ResourceManager.GetStream("alerta2EOS1_10", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alertEOS2_3 {
+        internal static System.IO.UnmanagedMemoryStream alerta2EOS1_3 {
             get {
-                return ResourceManager.GetStream("alertEOS2_3", resourceCulture);
+                return ResourceManager.GetStream("alerta2EOS1_3", resourceCulture);
             }
         }
         

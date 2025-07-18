@@ -12,6 +12,7 @@
         Width="950" Height="650"
         Background="Transparent"
         WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
         WindowState="Maximized"
         Topmost="True"
         ResizeMode="NoResize">
@@ -203,7 +204,9 @@
         <Grid Grid.Row="2" Grid.Column="1">
            
             <!-- Normal 2x2 grid - visible only if no alert -->
-            <ItemsControl ItemsSource="{Binding TimeSlots}" Visibility="{Binding IsAlertNotActive, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}">
+            <ItemsControl
+                ItemsSource="{Binding TimeSlots}"
+                Visibility="{Binding IsAlertNotActive, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <UniformGrid Columns="2" Rows="2"/>
@@ -213,7 +216,7 @@
                     <DataTemplate>
                         <Border Style="{StaticResource TimeBoxStyle}" 
                                 BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}" 
-                                BorderThickness="9" Margin="15">
+                                BorderThickness="9" Margin="25">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="0.015*"/>
@@ -272,9 +275,10 @@
                                            Source="{Binding Converter={StaticResource  ImageResourceConverter}, ConverterParameter=SandClock}"
                                            Margin="0"
                                            VerticalAlignment="Center"
-                                           Visibility="{Binding ShowSandClock, Converter={StaticResource BoolToVisibility}}"
+                                           Visibility="Visible"
                                            Stretch="Uniform"/>
                                 </Viewbox>
+                                <!-- Visibility="{Binding ShowSandClock, Converter={StaticResource BoolToVisibility}}" -->
                                 <Border Grid.Column="1" Margin="0,0,0,8"
                                     Style="{StaticResource BigTimeBoxStyle}" 
                                     BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}">
@@ -317,7 +321,7 @@
                         <DataTemplate>
                             <!-- Line 246: NEW: Added Grid with responsive padding around each smaller item -->
                             <Grid>
-                                <Border Margin="5,8,5,0"
+                                <Border Margin="5,8,5,8"
                                     Style="{StaticResource TimeBoxStyle}" 
                                     BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}">
                                     <Grid>
@@ -373,9 +377,9 @@
                     <Image Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=calendar}" Width="40" Height="40" Margin="5" Stretch="Uniform"/>
                     <!-- Double size -->
                 </Viewbox>
-                <Viewbox Grid.Column="1" HorizontalAlignment="Center" MaxHeight="30">
+                <Viewbox Grid.Column="1" HorizontalAlignment="Center" MaxHeight="34">
                     <!-- Increased MaxHeight -->
-                    <TextBlock Text="{Binding TodayDate}" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding TodayDate}" FontSize="24" FontWeight="SemiBold"/>
                 </Viewbox>
                 <Viewbox Grid.Column="2" HorizontalAlignment="Center" MaxHeight="60">
                     <!-- Increased MaxHeight -->
@@ -391,9 +395,9 @@
                     <Image Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=calendar}" Width="40" Height="40" Margin="5" Stretch="Uniform"/>
                     <!-- Double size -->
                 </Viewbox>
-                <Viewbox Grid.Column="5" HorizontalAlignment="Center" MaxHeight="30">
+                <Viewbox Grid.Column="5" HorizontalAlignment="Center" MaxHeight="34">
                     <!-- Increased MaxHeight -->
-                    <TextBlock Text="{Binding HebrewDate}" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding HebrewDate}" FontSize="24" FontWeight="SemiBold"/>
                 </Viewbox>
             </Grid>
         </Border>

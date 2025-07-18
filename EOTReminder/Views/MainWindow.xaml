@@ -1,0 +1,401 @@
+﻿<Window x:Class="EOTReminder.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:EOTReminder.ViewModels"
+        xmlns:conv="clr-namespace:EOTReminder.Converters"
+
+        xmlns:local="clr-namespace:EOTReminder.Views"
+        mc:Ignorable="d"
+        Title="Zmanim Reminder"
+        Width="950" Height="650"
+        Background="Transparent"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
+        Topmost="True"
+        ResizeMode="NoResize">
+    <!--WindowStyle="None"      
+        WindowState="Maximized"
+        Topmost="True"
+        ResizeMode="NoResize"-->
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <conv:ResourceToImageSourceConverter x:Key="ImageResourceConverter"/>
+
+        <Style x:Key="TimeBoxStyle" TargetType="Border">
+            <!-- Background with 20% transparency (80% opaque) -->
+            <Setter Property="Background" Value="#CCFFFFFF"/>
+            <Setter Property="CornerRadius" Value="15"/>
+            <Setter Property="Padding" Value="2"/>
+            <!-- Line 20: Removed fixed Margin from here -->
+            <!-- Opacity removed from Border to keep content fully opaque, applied to Background brush instead -->
+            <Setter Property="BorderBrush" Value="#999"/>
+            <Setter Property="BorderThickness" Value="5"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for big highlighted EO -->
+        <Style x:Key="BigTimeBoxStyle" TargetType="Border" BasedOn="{StaticResource TimeBoxStyle}">
+            <Setter Property="Padding" Value="20"/>
+            <!-- Line 26: Removed fixed Margin from here -->
+            <Setter Property="BorderThickness" Value="6"/>
+            <!-- Highlighted background with 20% transparency (80% opaque) -->
+            <Setter Property="Background" Value="#CCFFF3CD"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect ShadowDepth="4" Opacity="0.4" BlurRadius="8" Color="#FFD700"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Text style for descriptions -->
+        <Style x:Key="DescriptionTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+
+        <!-- Text style for times -->
+        <Style x:Key="TimeTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+
+        <!-- Text style for countdown -->
+        <Style x:Key="CountdownTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="Red"/>
+        </Style>
+
+        <!-- Text style for "Passed" status -->
+        <Style x:Key="StatusTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="Red"/>
+        </Style>
+
+        <!-- Placeholder for a simple clock icon -->
+        <!-- REPLACE with your actual clock icon image path (e.g., "pack://application:,,,/Assets/clock.png") -->
+        <!-- BitmapImage x:Key="ActualClockIcon" UriSource="/Assets/clock.png"/ -->
+        <!-- Placeholder for a simple calendar icon -->
+        <!-- REPLACE with your actual calendar icon image path -->
+        <!-- BitmapImage x:Key="ActualCalendarIcon" UriSource="/Assets/calendar.png"/-->
+        <!-- Placeholder for a sand clock icon -->
+        <!-- REPLACE with your actual sand clock icon image path -->
+        <!-- BitmapImage x:Key="ActualSandClockIcon" UriSource="/Assets/sandclock.png"/ -->
+
+
+    </Window.Resources>
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Grid>
+        <!-- Background -->
+        <Grid.Background>
+            <ImageBrush 
+                ImageSource="{Binding Converter={StaticResource  ImageResourceConverter}, ConverterParameter=background}" 
+                Stretch="UniformToFill"/>
+        </Grid.Background>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="0.11*"/>
+            <!-- For language selector and special times header -->
+            <RowDefinition Height="0.04*"/>
+            <!-- space between -->
+            <RowDefinition Height="0.73*"/>
+            <!-- Main content (EOS/EOT times) -->
+            <RowDefinition Height="0.04"/>
+            <!-- space between -->
+            <RowDefinition Height="0.12*"/>
+            <!-- For footer (Date, Current Time, Hebrew Date) -->
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.05*"/>
+            <ColumnDefinition Width="0.9*"/>
+            <ColumnDefinition Width="0.05*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Hidden Button Area for Options Page -->
+        <!-- NEW: Lines 100-106 -->
+        <Border Grid.Row="0" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="100" Height="100" Background="Transparent"
+                MouseLeftButtonDown="HiddenOptionsButton_MouseLeftButtonDown"
+                Panel.ZIndex="100">
+            <!-- Ensures it's on top of other elements -->
+            <!-- This Border acts as the hidden button area -->
+        </Border>
+
+        <!-- Header Section (Language Selector + Special Times) -->
+        <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="#F0F0F0" Padding="5">
+            <!-- Increased padding for height -->
+
+            <!-- Special Times (Sunrise, Midday, Sunset) -->
+            <Grid Margin="5,5" HorizontalAlignment="Stretch">
+                <!-- Increased margin for spacing -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.25*"/>
+                    <ColumnDefinition Width="0.125*"/>
+                    <ColumnDefinition Width="0.25*"/>
+                    <ColumnDefinition Width="0.125*"/>
+                    <ColumnDefinition Width="0.25*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Viewbox Grid.Column="0">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <!-- Increased MaxHeight for larger text/icons -->
+                            <TextBlock Text="נץ החמה" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <!-- Increased MaxHeight -->
+                            <TextBlock Text="{Binding Sunrise}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+                <Viewbox Grid.Column="1">
+                    <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
+                </Viewbox>
+                <Viewbox Grid.Column="2">
+                    <!-- Double size -->
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <!-- Increased MaxHeight -->
+                            <TextBlock Text="חצות" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <!-- Increased MaxHeight -->
+                            <TextBlock Text="{Binding Midday}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+                <Viewbox Grid.Column="3">
+                    <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
+                </Viewbox>
+                <Viewbox Grid.Column="4">
+                    <!-- Double size -->
+                    <StackPanel Grid.Column="4" Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <!-- Increased MaxHeight -->
+                            <TextBlock Text="שקיעה" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <!-- Increased MaxHeight -->
+                            <TextBlock Text="{Binding Sunset}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+            </Grid>
+        </Border>
+
+
+        <!-- Main Content -->
+        <Grid Grid.Row="2" Grid.Column="1">
+           
+            <!-- Normal 2x2 grid - visible only if no alert -->
+            <ItemsControl ItemsSource="{Binding TimeSlots}" Visibility="{Binding IsAlertNotActive, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="2" Rows="2"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource TimeBoxStyle}" 
+                                BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}" 
+                                BorderThickness="9" Margin="15">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="0.015*"/>
+                                    <RowDefinition Height="0.21*"/>
+                                    <RowDefinition Height="0.01*"/>
+                                    <RowDefinition Height="0.54*"/>
+                                    <RowDefinition Height="0.01*"/>
+                                    <RowDefinition Height="0.21*"/>
+                                    <RowDefinition Height="0.015*"/>
+                                </Grid.RowDefinitions>
+                                <Viewbox Grid.Row="1">
+                                        <TextBlock Text="{Binding Description}" FontSize="14" FontWeight="Bold" TextAlignment="Center"/>
+                                 </Viewbox>
+                                <Viewbox Grid.Row="3" MaxHeight="230">
+                                    <TextBlock Text="{Binding Time, StringFormat='HH:mm:ss'}" FontSize="52" TextAlignment="Center"/>
+                                 </Viewbox>
+                                <Viewbox Grid.Row="5">
+                                    <TextBlock Text="{Binding PassedText}"
+                                                 Foreground="Red"
+                                                 FontSize="24"
+                                                 FontWeight="Bold"
+                                                 Visibility="{Binding IsPassed, Converter={StaticResource BoolToVisibility}}"
+                                                 TextAlignment="Center"/>
+                                </Viewbox>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Alert mode - split top and bottom rows - visible only if alert is active -->
+            <Grid Visibility="{Binding IsAlertActive, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1.5*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Top big EO - binds to TopSlots (which will contain one item) -->
+                <ItemsControl ItemsSource="{Binding TopSlots}" Grid.Row="0" Padding="5">
+                    <!-- Line 217: Changed Margin to Padding -->
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="1" Rows="1"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="0.28*"/>
+                                    <ColumnDefinition Width="0.44*"/>
+                                    <ColumnDefinition Width="0.28*"/>
+                                </Grid.ColumnDefinitions>
+                                <Viewbox Grid.Column="0" HorizontalAlignment="Right">
+                                    <Image Width="150"  Height="450"
+                                           Source="{Binding Converter={StaticResource  ImageResourceConverter}, ConverterParameter=SandClock}"
+                                           Margin="0"
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding ShowSandClock, Converter={StaticResource BoolToVisibility}}"
+                                           Stretch="Uniform"/>
+                                </Viewbox>
+                                <Border Grid.Column="1" Margin="0,0,0,8"
+                                    Style="{StaticResource BigTimeBoxStyle}" 
+                                    BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="0.015*"/>
+                                            <RowDefinition Height="0.15*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.4*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.4*"/>
+                                            <RowDefinition Height="0.015*"/>
+                                        </Grid.RowDefinitions>
+
+                                            <Viewbox Grid.Row="1" MaxHeight="72">
+                                                <TextBlock Text="{Binding Description}" FontSize="18" FontWeight="Bold" TextAlignment="Center"/>
+                                            </Viewbox>
+                                            <Viewbox Grid.Row="3" MaxHeight="200">
+                                                <TextBlock Text="{Binding Time, StringFormat='HH:mm:ss'}" FontSize="85" TextAlignment="Center"/>
+                                            </Viewbox>
+                                            <Viewbox Grid.Row="5" MaxHeight="200">
+                                                <TextBlock Text="{Binding CountdownText, Mode=OneWay}" FontSize="85" Foreground="Red" TextAlignment="Center"/>
+                                            </Viewbox>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Bottom smaller EOs - binds to BottomSlots (which will contain three items) -->
+                <ItemsControl ItemsSource="{Binding BottomSlots}" Grid.Row="1" Padding="2">
+                    <!-- Line 239: Changed Margin to Padding -->
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3" Rows="1"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <!-- Line 246: NEW: Added Grid with responsive padding around each smaller item -->
+                            <Grid>
+                                <Border Margin="5,8,5,0"
+                                    Style="{StaticResource TimeBoxStyle}" 
+                                    BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="0.015*"/>
+                                            <RowDefinition Height="0.2*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.44*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.3*"/>
+                                            <RowDefinition Height="0.015*"/>
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Grid.Row="1">
+                                            <TextBlock Text="{Binding Description}" FontSize="14" FontWeight="Bold" TextAlignment="Center"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Row="3">
+                                            <TextBlock Text="{Binding Time, StringFormat='HH:mm:ss'}" FontSize="24" TextAlignment="Center"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Row="5">
+                                            <!-- TextBlock Text="{Binding Source={StaticResource HebrewPassedText}}" -->
+                                            <TextBlock Text="{Binding PassedText}"
+                                                       Foreground="Red"
+                                                       FontSize="32"
+                                                       FontWeight="Bold"
+                                                       Visibility="{Binding IsPassed, Converter={StaticResource BoolToVisibility}}"
+                                                       TextAlignment="Center"/>
+                                        </Viewbox>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Background="#F0F0F0">
+            <!-- Increased padding for height -->
+            <Grid HorizontalAlignment="Stretch">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.08*" />
+                    <ColumnDefinition Width="0.2*" />
+                    <ColumnDefinition Width="0.08*" />
+                    <ColumnDefinition Width="0.34*" />
+                    <ColumnDefinition Width="0.08*" />
+                    <ColumnDefinition Width="0.23*" />
+                    <ColumnDefinition Width="0.02*"/>
+
+                </Grid.ColumnDefinitions>
+                <Viewbox Grid.Column="0" HorizontalAlignment="Right" MaxHeight="60">
+                    <!-- Increased MaxHeight for larger text/icons -->
+                    <Image Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=calendar}" Width="40" Height="40" Margin="5" Stretch="Uniform"/>
+                    <!-- Double size -->
+                </Viewbox>
+                <Viewbox Grid.Column="1" HorizontalAlignment="Center" MaxHeight="30">
+                    <!-- Increased MaxHeight -->
+                    <TextBlock Text="{Binding TodayDate}" FontSize="18" FontWeight="SemiBold"/>
+                </Viewbox>
+                <Viewbox Grid.Column="2" HorizontalAlignment="Center" MaxHeight="60">
+                    <!-- Increased MaxHeight -->
+                    <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
+                    <!-- Double size -->
+                </Viewbox>
+                <Viewbox Grid.Column="3" HorizontalAlignment="Center">
+                    <!-- Increased MaxHeight -->
+                    <TextBlock Text="{Binding CurrentTime}" FontSize="42" FontWeight="SemiBold" />
+                </Viewbox>
+                <Viewbox Grid.Column="4" HorizontalAlignment="Right" MaxHeight="60">
+                    <!-- Increased MaxHeight -->
+                    <Image Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=calendar}" Width="40" Height="40" Margin="5" Stretch="Uniform"/>
+                    <!-- Double size -->
+                </Viewbox>
+                <Viewbox Grid.Column="5" HorizontalAlignment="Center" MaxHeight="30">
+                    <!-- Increased MaxHeight -->
+                    <TextBlock Text="{Binding HebrewDate}" FontSize="18" FontWeight="SemiBold"/>
+                </Viewbox>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

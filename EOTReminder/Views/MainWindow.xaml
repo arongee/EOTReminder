@@ -270,9 +270,9 @@
                                     <ColumnDefinition Width="0.28*"/>
                                 </Grid.ColumnDefinitions>
                                 <Viewbox Grid.Column="0" HorizontalAlignment="Right">
-                                    <Image Width="150"  Height="450"
+                                    <Image Width="180"  Height="500"
                                            Source="/Assets/sandclock.png"
-                                           Margin="0"
+                                           Margin="0,0,8,0"
                                            VerticalAlignment="Center"
                                            Visibility="Visible"
                                            Stretch="Uniform"/>

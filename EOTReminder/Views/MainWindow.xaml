@@ -372,16 +372,16 @@
                     <ColumnDefinition Width="0.02*"/>
 
                 </Grid.ColumnDefinitions>
-                <Viewbox Grid.Column="0" HorizontalAlignment="Right" MaxHeight="60">
+                <Viewbox Grid.Column="0" HorizontalAlignment="Right" MaxHeight="72">
                     <!-- Increased MaxHeight for larger text/icons -->
                     <Image Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=calendar}" Width="40" Height="40" Margin="5" Stretch="Uniform"/>
                     <!-- Double size -->
                 </Viewbox>
-                <Viewbox Grid.Column="1" HorizontalAlignment="Center" MaxHeight="34">
+                <Viewbox Grid.Column="1" HorizontalAlignment="Center" MaxHeight="36">
                     <!-- Increased MaxHeight -->
                     <TextBlock Text="{Binding TodayDate}" FontSize="24" FontWeight="SemiBold"/>
                 </Viewbox>
-                <Viewbox Grid.Column="2" HorizontalAlignment="Center" MaxHeight="60">
+                <Viewbox Grid.Column="2" HorizontalAlignment="Center" MaxHeight="72">
                     <!-- Increased MaxHeight -->
                     <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
                     <!-- Double size -->
@@ -390,12 +390,12 @@
                     <!-- Increased MaxHeight -->
                     <TextBlock Text="{Binding CurrentTime}" FontSize="42" FontWeight="SemiBold" />
                 </Viewbox>
-                <Viewbox Grid.Column="4" HorizontalAlignment="Right" MaxHeight="60">
+                <Viewbox Grid.Column="4" HorizontalAlignment="Right" MaxHeight="72">
                     <!-- Increased MaxHeight -->
                     <Image Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=calendar}" Width="40" Height="40" Margin="5" Stretch="Uniform"/>
                     <!-- Double size -->
                 </Viewbox>
-                <Viewbox Grid.Column="5" HorizontalAlignment="Center" MaxHeight="34">
+                <Viewbox Grid.Column="5" HorizontalAlignment="Center" MaxHeight="36">
                     <!-- Increased MaxHeight -->
                     <TextBlock Text="{Binding HebrewDate}" FontSize="24" FontWeight="SemiBold"/>
                 </Viewbox>

@@ -37,7 +37,8 @@ namespace EOTReminder.ViewModels
         private DateTime _internalMiddayTime;
         private DateTime _internalSunsetTime;
         private DateTime _reloadTriggerTime;
-
+        
+        private string _todaysDate;
         private string _hebrewDateString; // Private field for Hebrew date string
         private string _currentLang = "he"; // Default to Hebrew as per original code
         private readonly Dictionary<string, Dictionary<string, string>> _translations =
@@ -62,18 +63,22 @@ namespace EOTReminder.ViewModels
             };
 
         // Controls visibility of normal 2x2 grid vs. alert layout
-        public bool IsAlertActive 
+        public bool IsAlertActive
         {
             get => _isAlertActive;
             set { _isAlertActive = value; OnPropertyChanged(); }
         }
         // Controls visibility of normal 2x2 grid vs. alert layout
-        public bool IsAlertNotActive 
+        public bool IsAlertNotActive
         {
             get => _isAlertNotActive;
             set { _isAlertNotActive = value; OnPropertyChanged(); }
         }
-        public string TodayDate => DateTime.Now.ToString("dd/MM/yyyy");
+        public string TodayDate
+        {
+            get { return _todaysDate; } 
+            set { _todaysDate = value; OnPropertyChanged(); }
+        } 
         public string CurrentTime => DateTime.Now.ToString("HH:mm:ss");
         // Public string properties for UI binding
         public string HebrewDate
@@ -110,12 +115,12 @@ namespace EOTReminder.ViewModels
             LoadFromExcel();
             InitTimer();
 
-            _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));            
+            _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
         }
 
         public void InitializeData()
         {
-            
+
         }
 
         private void InitTimer()
@@ -193,8 +198,8 @@ namespace EOTReminder.ViewModels
                                 !slot.AlertFlags["3"])
                             {
                                 if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
-                                   PlayAlert(slot.Id, "3"); // Still pass "3" to choose the WAV file
-                                
+                                    PlayAlert(slot.Id, "3"); // Still pass "3" to choose the WAV file
+
                                 slot.AlertFlags["3"] = true;
                             }
                         }
@@ -221,7 +226,7 @@ namespace EOTReminder.ViewModels
                     // 1. The current time is past the calculated trigger time.
                     // 2. We haven't already reloaded for *this specific sunrise cycle*.
                     //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
-                    if (DateTime.Now >= _reloadTriggerTime && !_hasReloadedForCurrentSunriseCycle)
+                    if (DateTime.Now.TimeOfDay >= _reloadTriggerTime.TimeOfDay && !_hasReloadedForCurrentSunriseCycle)
                     {
                         Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {_reloadTriggerTime:HH:mm:ss}");
                         LoadFromExcel(); // Perform the actual scheduled reload
@@ -242,8 +247,15 @@ namespace EOTReminder.ViewModels
         {
             TimeSlots.Clear(); // Clear existing slots before Loading
 
+            var today = DateTime.Today;
+            DataRow todayRow = null;
+
+            TodayDate = DateTime.Now.ToString("dd/MM/yyyy");
+
+            HebrewDate = GetHebrewJewishDateString(today, false); // Calculate if not in Excel
+
             string path = Properties.Settings.Default.ExcelFilePath;
-          
+
             if (!File.Exists(path))
             {
                 path = @"C:\DailyTimes.xlsx";
@@ -279,9 +291,6 @@ namespace EOTReminder.ViewModels
                             LoadMock();
                             return;
                         }
-
-                        var today = DateTime.Today;
-                        DataRow todayRow = null;
 
                         // Find the "Date" column index dynamically
                         int dateColumnIndex = -1;
@@ -377,19 +386,6 @@ namespace EOTReminder.ViewModels
                         OnPropertyChanged(nameof(Midday));
                         OnPropertyChanged(nameof(Sunset));
 
-                        // Set Hebrew Date (can be read from Excel or calculated)
-                        // Example if HebrewDate column exists:
-                        // int hebrewDateColIndex = GetColumnIndex("HebrewDate");
-                        // if (hebrewDateColIndex != -1 && todayRow[hebrewDateColIndex] != DBNull.Value)
-                        // {
-                        //     HebrewDate = todayRow[hebrewDateColIndex].ToString();
-                        // }
-                        // else
-                        // {
-                        HebrewDate = GetHebrewJewishDateString(today, false); // Calculate if not in Excel
-                        // }
-                        OnPropertyChanged(nameof(HebrewDate));
-
                         // Check for any parsing errors using the internal DateTime fields
                         if (TimeSlots.Any(s => s.Time == DateTime.MinValue) ||
                             _internalSunriseTime == DateTime.MinValue || _internalMiddayTime == DateTime.MinValue || _internalSunsetTime == DateTime.MinValue)
@@ -424,7 +420,7 @@ namespace EOTReminder.ViewModels
 
             // Set internal DateTime fields for mock data
             _internalSunriseTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
-            _internalMiddayTime =  DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
+            _internalMiddayTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
             _internalSunsetTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
 
             HebrewDate = GetHebrewJewishDateString(now, false);

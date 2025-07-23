@@ -11,11 +11,11 @@
         Title="Zmanim Reminder"
         Width="950" Height="650"
         Background="Transparent"
-        WindowStartupLocation="CenterScreen">
-        <!--WindowStyle="None"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
         WindowState="Maximized"
         Topmost="True"
-        ResizeMode="NoResize"-->
+        ResizeMode="NoResize">
     <!--WindowStyle="None"      
         WindowState="Maximized"
         Topmost="True"

@@ -1,0 +1,2301 @@
+EOTReminder/
+│
+├── Assets/
+│   ├── background.jpg
+│   ├── clock.png
+│   ├── calendar.png
+│   ├── sandclock.png
+│   ├── alertEOS2_3.wav
+│   ├── alertEOS2_10.wav
+│   ├── alertEOS1_10.wav
+│   └── alertEOS1_3.wav
+│
+├── Properties
+│   ├── AssemblyInfo.cs
+│   ├── Resources.Designer.cs
+│   ├── Resources.resx
+│   ├── Settings.Designer.cs
+│   └── Settings.settings
+│
+├── Converters/
+│   ├── BoolToBrushConverter.cs
+│   └── ResourceToImageSourceConverter.cs  
+│
+├── Models/
+│   └── TimeSlot.cs
+│
+├── Utilities/
+│   └── Logger.cs
+│
+├── ViewModels/
+│   ├── MainViewModel.cs
+│   └── OptionsViewModel.cs
+│
+├── Views/
+│   ├── MainWindow.xaml
+│   ├── MainWindow.xaml.cs
+│   ├── OptionsWindow.xaml
+│   └── OptionsWindow.xaml.cs 
+│
+├── DailyTimes.xlsx          ← Your Excel file with date/times
+│
+├── App.xaml
+├── App.xaml.cs
+├── EOTReminder.csproj       ← Your project file
+├── FodyWeavers.xml
+└── packages.config
+
+
+<NOW LETS START TO COPY CODE>
+#########################################################
+//  <!-- Converters/BoolToBrushConverter.cs -->
+ 
+using System;
+using System.Globalization;
+using System.Windows.Data;
+using System.Windows.Media;
+
+namespace EOTReminder.Converters
+{
+    public class BoolToBrushConverter : IValueConverter
+    {
+        public SolidColorBrush HighlightBrush { get; set; } = new SolidColorBrush(Color.FromRgb(255, 215, 0)); // Gold
+        public SolidColorBrush NormalBrush { get; set; } = new SolidColorBrush(Color.FromRgb(153, 153, 153)); // #999
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is bool b && b ? HighlightBrush : NormalBrush;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
+
+#########################################################
+//  <!-- Converters/ResourceToImageSourceConverter.cs -->
+
+using System;
+using System.Globalization;
+using System.IO;
+using System.Windows.Data;
+using System.Windows.Media.Imaging;
+using System.Drawing; // IMPORTANT: You need to add a reference to System.Drawing in your project
+
+namespace EOTReminder.Converters
+{
+    /// <summary>
+    /// Converts a string resource name (e.g., "clock", "background") into a BitmapImage
+    /// suitable for use as an ImageSource in WPF. It loads the image from the
+    /// project's Properties.Resources.
+    /// </summary>
+    public class ResourceToImageSourceConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            // The 'parameter' is expected to be the string name of the resource (e.g., "clock", "background")
+            if (parameter is string resourceName && !string.IsNullOrEmpty(resourceName))
+            {
+                try
+                {
+                    // Get the resource object from Properties.Resources by its string name.
+                    // This assumes the images (like clock.png, background.jpg) have been
+                    // dragged into your project's Properties/Resources.resx file.
+                    object resourceObject = Properties.Resources.ResourceManager.GetObject(resourceName);
+
+                    // Check if the retrieved object is a System.Drawing.Bitmap
+                    if (resourceObject is Bitmap bitmap)
+                    {
+                        // Convert the System.Drawing.Bitmap to a System.Windows.Media.Imaging.BitmapImage
+                        // which is what WPF Image controls expect.
+                        using (MemoryStream memory = new MemoryStream())
+                        {
+                            // Save the bitmap to a memory stream as a PNG.
+                            // PNG format is generally good for transparency and quality.
+                            bitmap.Save(memory, System.Drawing.Imaging.ImageFormat.Png);
+                            memory.Position = 0; // Reset stream position to the beginning
+
+                            BitmapImage bitmapImage = new BitmapImage();
+                            bitmapImage.BeginInit();
+                            bitmapImage.StreamSource = memory;
+                            // Cache the image to improve performance.
+                            // OnLoad means the entire image is loaded into memory when created.
+                            bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                            bitmapImage.EndInit();
+
+                            return bitmapImage; // Return the WPF-compatible image source
+                        }
+                    }
+                    else if (resourceObject != null)
+                    {
+                        // Log a warning if the resource was found but is not of the expected Bitmap type.
+                        System.Diagnostics.Debug.WriteLine($"Resource '{resourceName}' found but is not a System.Drawing.Bitmap. Actual Type: {resourceObject.GetType().Name}");
+                        // You could also use your Logger utility here:
+                        // EOTReminder.Utilities.Logger.LogWarning($"Resource '{resourceName}' found but is not a System.Drawing.Bitmap. Actual Type: {resourceObject.GetType().Name}");
+                    }
+                    else
+                    {
+                        // Log a warning if the resource was not found at all.
+                        System.Diagnostics.Debug.WriteLine($"Resource '{resourceName}' not found in Properties.Resources.");
+                        // EOTReminder.Utilities.Logger.LogWarning($"Resource '{resourceName}' not found in Properties.Resources.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log any exceptions that occur during the loading or conversion process.
+                    System.Diagnostics.Debug.WriteLine($"Error loading resource '{resourceName}': {ex.Message}");
+                    // EOTReminder.Utilities.Logger.LogError($"Error loading image resource '{resourceName}': {ex.Message}", ex);
+                }
+            }
+            // Return null if the parameter is invalid or conversion fails,
+            // which will result in no image being displayed.
+            return null;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            // This converter is for one-way binding (source to target), so ConvertBack is not implemented.
+            throw new NotImplementedException();
+        }
+    }
+}
+
+
+
+#########################################################
+//  <!-- Models/TimeSlot.cs -->
+
+
+
+// Models/TimeSlot.cs
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace EOTReminder.Models
+{
+    public class TimeSlot : INotifyPropertyChanged
+    {
+        private string _description;
+        private bool _isPassed;
+        private string _countdownText;
+        private bool _showSandClock;
+        private bool _highlight;
+        private TimeSpan _countdown;
+        private bool _isIn30MinAlert;
+        private string _passedText;
+
+        public string Id { get; set; }
+        public DateTime Time { get; set; }
+
+        public Dictionary<string, bool> AlertFlags { get; set; } = new Dictionary<string, bool>()
+            {["30"] = false, ["10"] = false, ["3"] = false};
+
+        public string Description
+        {
+            get => _description;
+            set
+            {
+                _description = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string PassedText
+        {
+            get => _passedText;
+            set
+            {
+                _passedText = value;
+                OnPropertyChanged();
+            } 
+        }
+
+        public bool IsPassed
+        {
+            get => _isPassed;
+            set
+            {
+                _isPassed = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string CountdownText
+        {
+            get => _countdownText;
+            set
+            {
+                _countdownText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool ShowSandClock
+        {
+            get => _showSandClock;
+            set
+            {
+                _showSandClock = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool Highlight
+        {
+            get => _highlight;
+            set
+            {
+                _highlight = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public TimeSpan Countdown
+        {
+            get => _countdown;
+            set
+            {
+                _countdown = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsIn30MinAlert
+        {
+            get => _isIn30MinAlert;
+            set
+            {
+                _isIn30MinAlert = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string name = null) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+}
+
+
+#########################################################
+//  <!-- Utilities/Logger.cs -->
+
+
+
+using System;
+using System.IO;
+using System.Linq;
+
+namespace EOTReminder.Utilities
+{
+    public enum LogLevel
+    {
+        Info,
+        Warning,
+        Error
+    }
+
+    public static class Logger
+    {
+        private static readonly string LogDirectory = @"C:\EOTReminderLogs";
+        private static readonly string LogFileName = "app.log";
+        private static readonly long MaxFileSize = 1 * 1024 * 1024; // 1 MB (adjust as needed)
+
+        // Static constructor to ensure log directory exists when Logger is first accessed
+        static Logger()
+        {
+            EnsureLogDirectoryExists();
+        }
+
+        // Ensures the log directory exists, creating it if necessary.
+        private static void EnsureLogDirectoryExists()
+        {
+            if (!Directory.Exists(LogDirectory))
+            {
+                try
+                {
+                    Directory.CreateDirectory(LogDirectory);
+                    System.Diagnostics.Debug.WriteLine($"Log directory created: {LogDirectory}");
+                }
+                catch (Exception ex)
+                {
+                    // Fallback: if cannot create log directory, write to debug output
+                    System.Diagnostics.Debug.WriteLine($"ERROR: Could not create log directory {LogDirectory}. Logging will be limited to debug output. Exception: {ex.Message}");
+                }
+            }
+        }
+
+        // Logs an informational message.
+        public static void LogInfo(string message)
+        {
+            Log(message, LogLevel.Info);
+        }
+
+        // Logs a warning message.
+        public static void LogWarning(string message)
+        {
+            Log(message, LogLevel.Warning);
+        }
+
+        // Logs an error message, optionally including an exception.
+        public static void LogError(string message, Exception ex = null)
+        {
+            string fullMessage = message;
+            if (ex != null)
+            {
+                fullMessage += $" Exception: {ex.Message}";
+                if (ex.StackTrace != null)
+                {
+                    fullMessage += $"\nStackTrace: {ex.StackTrace}";
+                }
+            }
+            Log(fullMessage, LogLevel.Error);
+        }
+
+        // Core logging method that writes to the file and handles rotation.
+        private static void Log(string message, LogLevel level)
+        {
+            string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{level.ToString().ToUpper()}] {message}";
+
+            // Always write to debug output for immediate visibility during development
+            System.Diagnostics.Debug.WriteLine(logEntry);
+
+            string currentLogFilePath = Path.Combine(LogDirectory, LogFileName);
+
+            try
+            {
+                // Check file size before writing to potentially trigger rotation
+                if (File.Exists(currentLogFilePath))
+                {
+                    FileInfo fileInfo = new FileInfo(currentLogFilePath);
+                    if (fileInfo.Length >= MaxFileSize)
+                    {
+                        RotateLogFiles();
+                    }
+                }
+                File.AppendAllText(currentLogFilePath, logEntry + Environment.NewLine);
+            }
+            catch (Exception ex)
+            {
+                // If logging to file fails, ensure it's still visible in debug output
+                System.Diagnostics.Debug.WriteLine($"CRITICAL ERROR: Failed to write to log file {currentLogFilePath}. Exception: {ex.Message}");
+            }
+        }
+
+        // Manages log file rotation.
+        private static void RotateLogFiles()
+        {
+            string currentLogFilePath = Path.Combine(LogDirectory, LogFileName);
+
+            // Get all existing numbered log files (e.g., app.log.1, app.log.2)
+            var existingLogFiles = Directory.GetFiles(LogDirectory, $"{Path.GetFileNameWithoutExtension(LogFileName)}.*")
+                                            .Select(f => new { Path = f, Number = ParseLogFileNumber(f) })
+                                            .Where(x => x.Number.HasValue)
+                                            .OrderByDescending(x => x.Number) // Start from highest number (oldest)
+                                            .ToList();
+
+            // Shift existing files to higher numbers
+            foreach (var file in existingLogFiles)
+            {
+                string newPath = Path.Combine(LogDirectory, $"{Path.GetFileNameWithoutExtension(LogFileName)}.{file.Number.Value + 1}");
+                try
+                {
+                    if (File.Exists(newPath))
+                    {
+                        File.Delete(newPath); // Delete if the target file already exists
+                    }
+                    File.Move(file.Path, newPath);
+                    System.Diagnostics.Debug.WriteLine($"Moved log file: {file.Path} to {newPath}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ERROR: Failed to move log file {file.Path} to {newPath} during rotation. Exception: {ex.Message}");
+                }
+            }
+
+            // Rename the current log file to .log.1
+            if (File.Exists(currentLogFilePath))
+            {
+                string newCurrentLogPath = Path.Combine(LogDirectory, $"{Path.GetFileNameWithoutExtension(LogFileName)}.1");
+                try
+                {
+                    if (File.Exists(newCurrentLogPath))
+                    {
+                        File.Delete(newCurrentLogPath); // Ensure target is clear
+                    }
+                    File.Move(currentLogFilePath, newCurrentLogPath);
+                    System.Diagnostics.Debug.WriteLine($"Rotated current log file: {currentLogFilePath} to {newCurrentLogPath}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ERROR: Failed to rotate current log file {currentLogFilePath} to {newCurrentLogPath}. Exception: {ex.Message}");
+                }
+            }
+        }
+
+        // Parses the numeric suffix from a log file name (e.g., "app.log.1" -> 1).
+        private static int? ParseLogFileNumber(string filePath)
+        {
+            string fileName = Path.GetFileName(filePath);
+            string extension = Path.GetExtension(fileName); // e.g., ".log" or ".1"
+            string nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName); // e.g., "app" or "app.log"
+
+            // If the extension is numeric, it's a rotated file
+            if (extension.Length > 1 && int.TryParse(extension.Substring(1), out int number))
+            {
+                // Check if the part before the number is the base log file name
+                if (nameWithoutExtension.Equals(Path.GetFileNameWithoutExtension(LogFileName), StringComparison.OrdinalIgnoreCase) ||
+                    nameWithoutExtension.Equals(LogFileName, StringComparison.OrdinalIgnoreCase)) // For app.log.1 case where nameWithoutExtension is "app.log"
+                {
+                    return number;
+                }
+            }
+            return null;
+        }
+    }
+}
+
+
+
+#########################################################
+//  <!-- ViewModels/MainViewModel.cs -->  Full MVVM Features
+
+using EOTReminder.Models;
+using EOTReminder.Utilities;
+using ExcelDataReader;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Data;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Media;
+using System.Net;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Timers;
+using System.Windows;
+
+namespace EOTReminder.ViewModels
+{
+    public class MainViewModel : INotifyPropertyChanged
+    {
+        public ObservableCollection<TimeSlot> TimeSlots { get; set; } = new ObservableCollection<TimeSlot>();
+        public ObservableCollection<TimeSlot> TopSlots { get; } = new ObservableCollection<TimeSlot>();
+        public ObservableCollection<TimeSlot> BottomSlots { get; } = new ObservableCollection<TimeSlot>();
+
+        private bool _isAlertActive;
+        private DateTime _lastExcelReloadDate = DateTime.MinValue;
+        private bool _hasReloadedForCurrentSunriseCycle = false;
+        private DateTime _currentSunriseForReloadCheck = DateTime.MinValue;
+        private bool _isSefiratHaOmer; // NEW: For Sefirat HaOmer visibility
+        private string _sefiratHaOmerText; // NEW: For Sefirat HaOmer text
+
+        public bool IsAlertActive
+        {
+            get => _isAlertActive;
+            set { _isAlertActive = value; OnPropertyChanged(); }
+        }
+
+        public bool IsAlertNotActive
+        {
+            get => !_isAlertActive;
+            set { _isAlertNotActive = value; OnPropertyChanged(); }
+        }
+
+        public bool IsSefiratHaOmer // NEW: Property to control Omer display
+        {
+            get => _isSefiratHaOmer;
+            set { _isSefiratHaOmer = value; OnPropertyChanged(); }
+        }
+
+        public string SefiratHaOmerText // NEW: Property for Omer count text
+        {
+            get => _sefiratHaOmerText;
+            set { _sefiratHaOmerText = value; OnPropertyChanged(); }
+        }
+
+        public string TodayDate => DateTime.Now.ToString("dd/MM/yyyy");
+        public string CurrentTime => DateTime.Now.ToString("HH:mm:ss");
+
+        private DateTime _internalSunriseTime;
+        private DateTime _internalMiddayTime;
+        private DateTime _internalSunsetTime;
+        private string _hebrewDateString;
+
+        public string HebrewDate
+        {
+            get => _hebrewDateString;
+            private set { _hebrewDateString = value; OnPropertyChanged(); }
+        }
+        public string Sunrise
+        {
+            get => _internalSunriseTime == DateTime.MinValue ? "N/A" : _internalSunriseTime.ToString("HH:mm:ss");
+            private set { /* Setter is not used */ }
+        }
+        public string Midday
+        {
+            get => _internalMiddayTime == DateTime.MinValue ? "N/A" : _internalMiddayTime.ToString("HH:mm:ss");
+            private set { /* Setter is not used */ }
+        }
+        public string Sunset
+        {
+            get => _internalSunsetTime == DateTime.MinValue ? "N/A" : _internalSunsetTime.ToString("HH:mm:ss");
+            private set { /* Setter is not used */ }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private Timer _timer;
+        private string _currentLang = "he";
+
+        private readonly Dictionary<string, Dictionary<string, string>> _translations =
+            new Dictionary<string, Dictionary<string, string>>()
+            {
+                ["en"] = new Dictionary<string, string>()
+                {
+                    ["a2EOS1"] = "End of Shema 1",
+                    ["a1EOS2"] = "End of Shema 2",
+                    ["b2EOT1"] = "End of Prayer 1",
+                    ["b1EOT2"] = "End of Prayer 2",
+                    ["Passed"] = "Passed"
+                },
+                ["he"] = new Dictionary<string, string>()
+                {
+                    ["a2EOS1"] = "סו\"ז קר\"ש מג\"א",
+                    ["a1EOS2"] = "סו\"ז קר\"ש תניא גר\"א",
+                    ["b2EOT1"] = "סו\"ז תפילה מג\"א",
+                    ["b1EOT2"] = "סו\"ז תפילה תניא גר\"א",
+                    ["Passed"] = "עבר זמנו",
+                }
+            };
+
+        // NEW: Dictionary for Hebrew number words
+        private readonly Dictionary<int, string> _hebrewNumberWords = new Dictionary<int, string>
+        {
+            { 1, "אחד" }, { 2, "שניים" }, { 3, "שלשה" }, { 4, "ארבעה" }, { 5, "חמשה" },
+            { 6, "ששה" }, { 7, "שבעה" }, { 8, "שמונה" }, { 9, "תשעה" }, { 10, "עשרה" },
+            { 11, "אחד עשר" }, { 12, "שניים עשר" }, { 13, "שלשה עשר" }, { 14, "ארבעה עשר" },
+            { 15, "חמשה עשר" }, { 16, "ששה עשר" }, { 17, "שבעה עשר" }, { 18, "שמונה עשר" },
+            { 19, "תשעה עשר" }, { 20, "עשרים" }, { 30, "שלושים" }, { 40, "ארבעים" }, { 50, "חמישים" }
+        };
+
+        public MainViewModel()
+        {
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            LoadFromExcel();
+            InitTimer();
+        }
+
+        public void InitializeData()
+        {
+        }
+
+        private void InitTimer()
+        {
+            _timer = new Timer(1000);
+            _timer.Elapsed += (s, e) =>
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    foreach (var slot in TimeSlots)
+                    {
+                        slot.Countdown = slot.Time - DateTime.Now;
+                        int firstAlertMin = Properties.Settings.Default.FirstAlertMinutes;
+                        int secondAlertMin = Properties.Settings.Default.SecondAlertMinutes;
+                        int visualAlertMin = Properties.Settings.Default.VisualAlertMinutes;
+
+                        if (!slot.IsPassed && slot.Countdown <= TimeSpan.Zero)
+                        {
+                            slot.Highlight = false;
+                            slot.IsPassed = true;
+                            slot.CountdownText = "";
+                            slot.ShowSandClock = false;
+                            slot.IsIn30MinAlert = false;
+                            slot.AlertFlags["30"] = false;
+                            slot.AlertFlags["10"] = false;
+                            slot.AlertFlags["3"] = false;
+                            IsAlertActive = false;
+                        }
+                        else if (!slot.IsPassed)
+                        {
+                            if (slot.Countdown.TotalMinutes <= visualAlertMin && !slot.AlertFlags["30"])
+                            {
+                                IsAlertActive = true;
+                                slot.IsIn30MinAlert = true;
+                                slot.Highlight = true;
+                                slot.ShowSandClock = true;
+                                slot.AlertFlags["30"] = true;
+                            }
+                            else if (slot.Countdown.TotalMinutes > visualAlertMin && slot.AlertFlags["30"])
+                            {
+                                IsAlertActive = false;
+                                slot.IsIn30MinAlert = false;
+                                slot.Highlight = false;
+                                slot.ShowSandClock = false;
+                                slot.AlertFlags["30"] = false;
+                            }
+
+                            slot.CountdownText = string.Format("{0:D2}:{1:D2}",
+                                (int)Math.Floor(slot.Countdown.TotalMinutes),
+                                slot.Countdown.Seconds);
+
+                            if (firstAlertMin > 0 &&
+                                slot.Countdown.TotalMinutes <= firstAlertMin &&
+                                slot.Countdown.TotalMinutes > (firstAlertMin - 1) &&
+                                !slot.AlertFlags["10"])
+                            {
+                                if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
+                                    PlayAlert(slot.Id, "10");
+                                slot.AlertFlags["10"] = true;
+                            }
+
+                            if (secondAlertMin > 0 &&
+                                slot.Countdown.TotalMinutes <= secondAlertMin &&
+                                slot.Countdown.TotalMinutes > (secondAlertMin - 1) &&
+                                !slot.AlertFlags["3"])
+                            {
+                                if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
+                                    PlayAlert(slot.Id, "3");
+                                slot.AlertFlags["3"] = true;
+                            }
+
+                            if (_internalSunriseTime.Date != DateTime.Today)
+                            {
+                                _hasReloadedForCurrentSunriseCycle = false;
+                                _currentSunriseForReloadCheck = _internalSunriseTime;
+                                Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
+                            }
+
+                            DateTime reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
+                            if (DateTime.Now >= reloadTriggerTime && !_hasReloadedForCurrentSunriseCycle)
+                            {
+                                Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {reloadTriggerTime:HH:mm:ss}");
+                                LoadFromExcel();
+                                _hasReloadedForCurrentSunriseCycle = true;
+                                _currentSunriseForReloadCheck = _internalSunriseTime;
+                            }
+                        }
+                    }
+
+                    IsAlertNotActive = !IsAlertActive;
+                    UpdateSlotCollections();
+                    OnPropertyChanged(nameof(CurrentTime));
+                    // NEW: Update Sefirat HaOmer status
+                    IsSefiratHaOmer = Properties.Settings.Default.SefiratHaOmerEnabled && IsInSefiratHaOmerPeriod(DateTime.Today);
+                    if (IsSefiratHaOmer)
+                    {
+                        SefiratHaOmerText = GetSefiratHaOmerText(DateTime.Today);
+                    }
+                });
+            };
+            _timer.Start();
+        }
+
+        private void LoadFromExcel()
+        {
+            string path = Properties.Settings.Default.ExcelFilePath;
+            if (!File.Exists(path))
+            {
+                Logger.LogWarning($"Excel file '{path}' not found. Loading mock data.");
+                LoadMock();
+                return;
+            }
+
+            try
+            {
+                using (var stream = File.Open(path, FileMode.Open, FileAccess.Read))
+                {
+                    using (var reader = ExcelReaderFactory.CreateReader(stream))
+                    {
+                        var dataSet = reader.AsDataSet(new ExcelDataSetConfiguration()
+                        {
+                            ConfigureDataTable = _ => new ExcelDataTableConfiguration()
+                            {
+                                UseHeaderRow = true
+                            }
+                        });
+
+                        var table = dataSet.Tables[0];
+                        if (table == null)
+                        {
+                            Logger.LogWarning("No data tables found in the Excel file. Loading mock data.");
+                            LoadMock();
+                            return;
+                        }
+
+                        var today = DateTime.Today;
+                        DataRow todayRow = null;
+
+                        int dateColumnIndex = -1;
+                        for (int i = 0; i < table.Columns.Count; i++)
+                        {
+                            if (table.Columns[i].ColumnName.Equals("Date", StringComparison.OrdinalIgnoreCase))
+                            {
+                                dateColumnIndex = i;
+                                break;
+                            }
+                        }
+
+                        if (dateColumnIndex == -1)
+                        {
+                            Logger.LogWarning("'Date' column not found in Excel. Loading mock data.");
+                            LoadMock();
+                            return;
+                        }
+
+                        foreach (DataRow row in table.Rows)
+                        {
+                            if (row[dateColumnIndex] != DBNull.Value && DateTime.TryParse(row[dateColumnIndex].ToString(), out DateTime excelDate))
+                            {
+                                if (excelDate.Date == today.Date)
+                                {
+                                    todayRow = row;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (todayRow == null)
+                        {
+                            Logger.LogWarning($"No entry found for today's date ({today.ToShortDateString()}) in '{path}'. Loading mock data.");
+                            LoadMock();
+                            return;
+                        }
+
+                        int GetColumnIndex(string columnName)
+                        {
+                            for (int i = 0; i < table.Columns.Count; i++)
+                            {
+                                if (table.Columns[i].ColumnName.Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    return i;
+                                }
+                            }
+                            return -1;
+                        }
+
+                        DateTime ParseTimeFromCell(DataRow row, string columnName)
+                        {
+                            int colIndex = GetColumnIndex(columnName);
+                            if (colIndex != -1 && row[colIndex] != DBNull.Value)
+                            {
+                                string timeString = row[colIndex].ToString();
+                                if (TimeSpan.TryParse(timeString, out TimeSpan timeSpan))
+                                {
+                                    return today.Add(timeSpan);
+                                }
+                                else if (DateTime.TryParse(timeString, out DateTime dateTimeFromCell))
+                                {
+                                    return today.Add(dateTimeFromCell.TimeOfDay);
+                                }
+                            }
+                            return DateTime.MinValue;
+                        }
+
+                        TimeSlots.Clear();
+                        // Modified: Add only EOS1 and EOT1 if UseSingleDeadline is true
+                        if (Properties.Settings.Default.UseSingleDeadline)
+                        {
+                            AddSlot("a2EOS1", ParseTimeFromCell(todayRow, "EOS1"));
+                            AddSlot("b2EOT1", ParseTimeFromCell(todayRow, "EOT1"));
+                        }
+                        else
+                        {
+                            AddSlot("a1EOS2", ParseTimeFromCell(todayRow, "EOS2"));
+                            AddSlot("a2EOS1", ParseTimeFromCell(todayRow, "EOS1"));
+                            AddSlot("b1EOT2", ParseTimeFromCell(todayRow, "EOT2"));
+                            AddSlot("b2EOT1", ParseTimeFromCell(todayRow, "EOT1"));
+                        }
+
+                        TimeSlots.OrderBy(s => s.Id);
+
+                        _internalSunriseTime = ParseTimeFromCell(todayRow, "Sunrise");
+                        _internalMiddayTime = ParseTimeFromCell(todayRow, "Midday");
+                        _internalSunsetTime = ParseTimeFromCell(todayRow, "Sunset");
+
+                        OnPropertyChanged(nameof(Sunrise));
+                        OnPropertyChanged(nameof(Midday));
+                        OnPropertyChanged(nameof(Sunset));
+
+                        HebrewDate = GetHebrewJewishDateString(today, false);
+                        OnPropertyChanged(nameof(HebrewDate));
+
+                        if (TimeSlots.Any(s => s.Time == DateTime.MinValue) ||
+                            _internalSunriseTime == DateTime.MinValue || _internalMiddayTime == DateTime.MinValue || _internalSunsetTime == DateTime.MinValue)
+                        {
+                            Logger.LogWarning("Some times could not be parsed from Excel. Using mock data for missing values.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"An error occurred while reading the Excel file: {ex.Message}\nLoading mock data instead.");
+                LoadMock();
+            }
+
+            foreach (var slot in TimeSlots)
+            {
+                slot.AlertFlags = new Dictionary<string, bool>() { ["30"] = false, ["10"] = false, ["3"] = false };
+            }
+
+            // NEW: Update Sefirat HaOmer status
+            IsSefiratHaOmer = Properties.Settings.Default.SefiratHaOmerEnabled && IsInSefiratHaOmerPeriod(DateTime.Today);
+            if (IsSefiratHaOmer)
+            {
+                SefiratHaOmerText = GetSefiratHaOmerText(DateTime.Today);
+            }
+        }
+
+        private void LoadMock()
+        {
+            TimeSlots.Clear();
+            var now = DateTime.Now;
+            if (Properties.Settings.Default.UseSingleDeadline)
+            {
+                AddSlot("a2EOS1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("b2EOT1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                AddSlot("a2EOS1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("a1EOS2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("b2EOT1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("b1EOT2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+            }
+
+            _internalSunriseTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
+            _internalMiddayTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
+            _internalSunsetTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
+
+            HebrewDate = GetHebrewJewishDateString(now, false);
+            // NEW: Update Sefirat HaOmer status for mock data
+            IsSefiratHaOmer = Properties.Settings.Default.SefiratHaOmerEnabled && IsInSefiratHaOmerPeriod(DateTime.Today);
+            if (IsSefiratHaOmer)
+            {
+                SefiratHaOmerText = GetSefiratHaOmerText(DateTime.Today);
+            }
+
+            OnPropertyChanged(nameof(Sunrise));
+            OnPropertyChanged(nameof(Midday));
+            OnPropertyChanged(nameof(Sunset));
+            OnPropertyChanged(nameof(HebrewDate));
+        }
+
+        private void AddSlot(string id, DateTime time)
+        {
+            TimeSlots.Add(new TimeSlot
+            {
+                Id = id,
+                Description = _translations[_currentLang][id],
+                PassedText = _translations[_currentLang]["Passed"],
+                Time = time,
+                IsPassed = false,
+                CountdownText = "",
+                ShowSandClock = false,
+                Highlight = false,
+                IsIn30MinAlert = false,
+                AlertFlags = new Dictionary<string, bool>() { ["30"] = false, ["10"] = false, ["3"] = false }
+            });
+            // NEW: Notify Sefirat HaOmer status after adding slots
+            OnPropertyChanged(nameof(IsSefiratHaOmer));
+        }
+
+        private void PlayAlert(string slotId, string minutesBefore)
+        {
+            string fileName = String.Empty;
+            string extFileName = String.Empty;
+            if (slotId == "a2EOS1" &&
+                minutesBefore == Properties.Settings.Default.FirstAlertMinutes.ToString() &&
+                !string.IsNullOrEmpty(Properties.Settings.Default.EOS1FirstAlertPath))
+                extFileName = Properties.Settings.Default.EOS1FirstAlertPath;
+            else if (slotId == "a2EOS1" &&
+                     minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
+                     !string.IsNullOrEmpty(Properties.Settings.Default.EOS1SecondAlertPath))
+                extFileName = Properties.Settings.Default.EOS1SecondAlertPath;
+            else if (slotId == "a1EOS2" &&
+                     minutesBefore == Properties.Settings.Default.FirstAlertMinutes.ToString() &&
+                     !string.IsNullOrEmpty(Properties.Settings.Default.EOS2FirstAlertPath))
+                extFileName = Properties.Settings.Default.EOS2FirstAlertPath;
+            else if (slotId == "a1EOS2" &&
+                     minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
+                     !string.IsNullOrEmpty(Properties.Settings.Default.EOS2SecondAlertPath))
+                extFileName = Properties.Settings.Default.EOS2SecondAlertPath;
+            else
+                fileName = $"alert{slotId}_{minutesBefore}.wav";
+            try
+            {
+                SoundPlayer player = null;
+                if (!string.IsNullOrEmpty(extFileName))
+                {
+                    player = new SoundPlayer(extFileName);
+                    System.Diagnostics.Debug.WriteLine($"Playing resource from settings");
+                }
+                else if (!string.IsNullOrEmpty(fileName))
+                {
+                    string resourceKey = Path.GetFileNameWithoutExtension(fileName);
+                    Stream stream = Properties.Resources.ResourceManager.GetStream(resourceKey);
+                    if (stream != null)
+                    {
+                        player = new SoundPlayer(stream);
+                    }
+                    System.Diagnostics.Debug.WriteLine($"Playing resource from Resources.resx: {resourceKey}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Resource not found in Resources.resx. and settings not set for {slotId} alert {minutesBefore}");
+                    return;
+                }
+                player.Play();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error playing embedded sound: {ex.Message}");
+            }
+        }
+
+        private void UpdateSlotCollections()
+        {
+            var alertSlot = TimeSlots.FirstOrDefault(slot => slot.IsIn30MinAlert && !slot.IsPassed);
+            TopSlots.Clear();
+            BottomSlots.Clear();
+            ObservableCollection<TimeSlot> temp = new ObservableCollection<TimeSlot>();
+            if (alertSlot != null)
+            {
+                IsAlertActive = true;
+                TopSlots.Add(alertSlot);
+                foreach (var slot in TimeSlots.Where(s => s != alertSlot))
+                {
+                    temp.Add(slot);
+                }
+                foreach (var slot in temp.OrderByDescending(s => s.Time))
+                {
+                    BottomSlots.Add(slot);
+                }
+            }
+            else
+            {
+                IsAlertActive = false;
+            }
+            OnPropertyChanged(nameof(TopSlots));
+            OnPropertyChanged(nameof(BottomSlots));
+            // NEW: Notify Sefirat HaOmer status
+            OnPropertyChanged(nameof(IsSefiratHaOmer));
+        }
+
+        internal void StopTimer()
+        {
+            if (_timer != null)
+            {
+                _timer.Stop();
+                _timer.Dispose();
+                _timer = null;
+                Logger.LogInfo("Timer stopped and disposed.");
+            }
+        }
+
+        private string GetHebrewJewishDateString(DateTime anyDate, bool addDayOfWeek)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            CultureInfo cultureInfo = CultureInfo.CreateSpecificCulture("he-IL");
+            cultureInfo.DateTimeFormat.Calendar = new HebrewCalendar();
+            if (addDayOfWeek)
+            {
+                stringBuilder.Append(anyDate.ToString("dddd", cultureInfo) + " ");
+            }
+            stringBuilder.Append(anyDate.ToString("dd", cultureInfo) + " ");
+            stringBuilder.Append(anyDate.ToString("y", cultureInfo) ?? "");
+            return stringBuilder.ToString();
+        }
+
+        // NEW: Method to check if the date is in Sefirat HaOmer period
+        private bool IsInSefiratHaOmerPeriod(DateTime date)
+        {
+            var hebrewCalendar = new HebrewCalendar();
+            int hebrewYear = hebrewCalendar.GetYear(date);
+            int hebrewMonth = hebrewCalendar.GetMonth(date);
+            int hebrewDay = hebrewCalendar.GetDayOfMonth(date);
+
+            DateTime nisan16 = hebrewCalendar.ToDateTime(hebrewYear, 1, 16, 0, 0, 0, 0);
+            DateTime sivan6 = hebrewCalendar.ToDateTime(hebrewYear, 3, 6, 0, 0, 0, 0);
+
+            if (hebrewMonth == 1 && hebrewDay >= 16)
+            {
+                return true;
+            }
+            else if (hebrewMonth == 2)
+            {
+                return true;
+            }
+            else if (hebrewMonth == 3 && hebrewDay <= 6)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        // NEW: Method to generate Sefirat HaOmer text
+        private string GetSefiratHaOmerText(DateTime date)
+        {
+            var hebrewCalendar = new HebrewCalendar();
+            int hebrewYear = hebrewCalendar.GetYear(date);
+            DateTime nisan16 = hebrewCalendar.ToDateTime(hebrewYear, 1, 16, 0, 0, 0, 0);
+            int omerDay = (date.Date - nisan16.Date).Days + 1;
+
+            if (omerDay < 1 || omerDay > 49)
+            {
+                return "";
+            }
+
+            int weeks = omerDay / 7;
+            int days = omerDay % 7;
+            string weeksText = weeks > 0 ? $"{_hebrewNumberWords[weeks]} שבועות" : "";
+            string daysText = days > 0 ? $"{_hebrewNumberWords[days]} ימים" : "";
+            string conjunction = weeks > 0 && days > 0 ? " ו" : "";
+            string omerText = $"היום {_hebrewNumberWords[omerDay]} ימים שהם {weeksText}{conjunction}{daysText} לעומר";
+            if (weeks == 0)
+            {
+                omerText = $"היום {_hebrewNumberWords[omerDay]} ימים לעומר";
+            }
+            if (days == 0 && weeks > 0)
+            {
+                omerText = $"היום {_hebrewNumberWords[omerDay]} ימים שהם {weeksText} לעומר";
+            }
+            return omerText;
+        }
+
+        public void SwitchLanguage(string lang)
+        {
+            _currentLang = lang;
+            foreach (var slot in TimeSlots)
+            {
+                if (_translations[lang].TryGetValue(slot.Id, out var trans))
+                    slot.Description = trans;
+            }
+            foreach (var slot in TimeSlots.Where(s => s.IsPassed))
+            {
+            }
+            OnPropertyChanged(nameof(TimeSlots));
+        }
+
+        private void OnPropertyChanged([CallerMemberName] string name = null) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+}
+
+#########################################################
+//  <!-- ViewModels/OptionsViewModel.cs --> Full MVVM Features
+
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using Microsoft.Win32; // For OpenFileDialog
+using EOTReminder.Utilities;
+
+namespace EOTReminder.ViewModels
+{
+    public class OptionsViewModel : INotifyPropertyChanged
+    {
+        // Existing Settings
+        private int _firstAlertMinutes;
+        public int FirstAlertMinutes
+        {
+            get => _firstAlertMinutes;
+            set { _firstAlertMinutes = value; OnPropertyChanged(); }
+        }
+
+        private int _secondAlertMinutes;
+        public int SecondAlertMinutes
+        {
+            get => _secondAlertMinutes;
+            set { _secondAlertMinutes = value; OnPropertyChanged(); }
+        }
+
+        private string _excelFilePath;
+        public string ExcelFilePath
+        {
+            get => _excelFilePath;
+            set { _excelFilePath = value; OnPropertyChanged(); }
+        }
+
+        // NEW: UseSingleDeadline setting
+        private bool _useSingleDeadline;
+        public bool UseSingleDeadline
+        {
+            get => _useSingleDeadline;
+            set { _useSingleDeadline = value; OnPropertyChanged(); }
+        }
+
+        // NEW: SefiratHaOmerEnabled setting
+        private bool _sefiratHaOmerEnabled;
+        public bool SefiratHaOmerEnabled
+        {
+            get => _sefiratHaOmerEnabled;
+            set { _sefiratHaOmerEnabled = value; OnPropertyChanged(); }
+        }
+
+        // Existing Audio Alert Paths
+        private string _eos1FirstAlertPath;
+        public string EOS1FirstAlertPath
+        {
+            get => _eos1FirstAlertPath;
+            set { _eos1FirstAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private string _eos1SecondAlertPath;
+        public string EOS1SecondAlertPath
+        {
+            get => _eos1SecondAlertPath;
+            set { _eos1SecondAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private string _eos2FirstAlertPath;
+        public string EOS2FirstAlertPath
+        {
+            get => _eos2FirstAlertPath;
+            set { _eos2FirstAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private string _eos2SecondAlertPath;
+        public string EOS2SecondAlertPath
+        {
+            get => _eos2SecondAlertPath;
+            set { _eos2SecondAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private string _eot1FirstAlertPath;
+        public string EOT1FirstAlertPath
+        {
+            get => _eot1FirstAlertPath;
+            set { _eot1FirstAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private string _eot1SecondAlertPath;
+        public string EOT1SecondAlertPath
+        {
+            get => _eot1SecondAlertPath;
+            set { _eot1SecondAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private string _eot2FirstAlertPath;
+        public string EOT2FirstAlertPath
+        {
+            get => _eot2FirstAlertPath;
+            set { _eot2FirstAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private string _eot2SecondAlertPath;
+        public string EOT2SecondAlertPath
+        {
+            get => _eot2SecondAlertPath;
+            set { _eot2SecondAlertPath = value; OnPropertyChanged(); }
+        }
+
+        private int _visualAlertMinutes;
+        public int VisualAlertMinutes
+        {
+            get => _visualAlertMinutes;
+            set { _visualAlertMinutes = value; OnPropertyChanged(); }
+        }
+
+        private bool _alertOnShabbos;
+        public bool AlertOnShabbos
+        {
+            get => _alertOnShabbos;
+            set { _alertOnShabbos = value; OnPropertyChanged(); }
+        }
+
+        // Commands
+        public ICommand SaveSettingsCommand { get; }
+        public ICommand CloseApplicationCommand { get; }
+        public ICommand CloseSettingsCommand { get; }
+        public ICommand BrowseExcelCommand { get; }
+        public ICommand BrowseEOS1FirstAlertCommand { get; }
+        public ICommand BrowseEOS1SecondAlertCommand { get; }
+        public ICommand BrowseEOS2FirstAlertCommand { get; }
+        public ICommand BrowseEOS2SecondAlertCommand { get; }
+        public ICommand BrowseEOT1FirstAlertCommand { get; }
+        public ICommand BrowseEOT1SecondAlertCommand { get; }
+        public ICommand BrowseEOT2FirstAlertCommand { get; }
+        public ICommand BrowseEOT2SecondAlertCommand { get; }
+
+        public OptionsViewModel()
+        {
+            LoadSettings();
+            SaveSettingsCommand = new RelayCommand(SaveSettings);
+            CloseApplicationCommand = new RelayCommand(CloseApplication);
+            CloseSettingsCommand = new RelayCommand(CloseSettings);
+            BrowseExcelCommand = new RelayCommand(BrowseExcelFile);
+            BrowseEOS1FirstAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOS1FirstAlertPath)));
+            BrowseEOS1SecondAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOS1SecondAlertPath)));
+            BrowseEOS2FirstAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOS2FirstAlertPath)));
+            BrowseEOS2SecondAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOS2SecondAlertPath)));
+            BrowseEOT1FirstAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOT1FirstAlertPath)));
+            BrowseEOT1SecondAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOT1SecondAlertPath)));
+            BrowseEOT2FirstAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOT2FirstAlertPath)));
+            BrowseEOT2SecondAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOT2SecondAlertPath)));
+        }
+
+        private void LoadSettings()
+        {
+            FirstAlertMinutes = Properties.Settings.Default.FirstAlertMinutes;
+            SecondAlertMinutes = Properties.Settings.Default.SecondAlertMinutes;
+            ExcelFilePath = Properties.Settings.Default.ExcelFilePath;
+            EOS1FirstAlertPath = Properties.Settings.Default.EOS1FirstAlertPath;
+            EOS1SecondAlertPath = Properties.Settings.Default.EOS1SecondAlertPath;
+            EOS2FirstAlertPath = Properties.Settings.Default.EOS2FirstAlertPath;
+            EOS2SecondAlertPath = Properties.Settings.Default.EOS2SecondAlertPath;
+            VisualAlertMinutes = Properties.Settings.Default.VisualAlertMinutes;
+            AlertOnShabbos = Properties.Settings.Default.AlertOnShabbos;
+            // NEW: Load new settings
+            UseSingleDeadline = Properties.Settings.Default.UseSingleDeadline;
+            SefiratHaOmerEnabled = Properties.Settings.Default.SefiratHaOmerEnabled;
+            Logger.LogInfo("Application settings loaded.");
+        }
+
+        private void SaveSettings(object parameter)
+        {
+            Properties.Settings.Default.FirstAlertMinutes = FirstAlertMinutes;
+            Properties.Settings.Default.SecondAlertMinutes = SecondAlertMinutes;
+            Properties.Settings.Default.ExcelFilePath = ExcelFilePath;
+            Properties.Settings.Default.EOS1FirstAlertPath = EOS1FirstAlertPath;
+            Properties.Settings.Default.EOS1SecondAlertPath = EOS1SecondAlertPath;
+            Properties.Settings.Default.EOS2FirstAlertPath = EOS2FirstAlertPath;
+            Properties.Settings.Default.EOS2SecondAlertPath = EOS2SecondAlertPath;
+            Properties.Settings.Default.VisualAlertMinutes = VisualAlertMinutes;
+            Properties.Settings.Default.AlertOnShabbos = AlertOnShabbos;
+            // NEW: Save new settings
+            Properties.Settings.Default.UseSingleDeadline = UseSingleDeadline;
+            Properties.Settings.Default.SefiratHaOmerEnabled = SefiratHaOmerEnabled;
+            Properties.Settings.Default.Save();
+            Logger.LogInfo("Application settings saved successfully.");
+            if (parameter is Window window)
+            {
+                window.Close();
+            }
+        }
+
+        private void CloseSettings(object parameter)
+        {
+            Logger.LogInfo("Settings window close requested.");
+            if (parameter is Window window)
+            {
+                window.Close();
+            }
+        }
+
+        private void CloseApplication(object parameter)
+        {
+            Logger.LogInfo("Application close requested from options window.");
+            if (parameter is Window window)
+            {
+                window.Close();
+            }
+            Application.Current.Shutdown();
+        }
+
+        private void BrowseExcelFile(object parameter)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "Excel Files (*.xlsx;*.xls)|*.xlsx;*.xls|All Files (*.*)|*.*";
+            openFileDialog.InitialDirectory = GetInitialDirectory(ExcelFilePath);
+            try
+            {
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    ExcelFilePath = openFileDialog.FileName;
+                    Logger.LogInfo($"Excel file path set to: {ExcelFilePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error opening file dialog for Excel file: {ex.Message}", ex);
+            }
+        }
+
+        private void BrowseAudioFile(string propertyName)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "WAV Audio Files (*.wav)|*.wav|All Files (*.*)|*.*";
+            string currentPath = GetPropertyValue(propertyName) as string;
+            openFileDialog.InitialDirectory = GetInitialDirectory(currentPath);
+            try
+            {
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    SetPropertyValue(propertyName, openFileDialog.FileName);
+                    Logger.LogInfo($"Audio file path for {propertyName} set to: {openFileDialog.FileName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error opening file dialog for audio file ({propertyName}): {ex.Message}", ex);
+            }
+        }
+
+        private string GetInitialDirectory(string currentPath)
+        {
+            if (!string.IsNullOrWhiteSpace(currentPath) && File.Exists(currentPath))
+            {
+                return Path.GetDirectoryName(currentPath);
+            }
+            if (!string.IsNullOrWhiteSpace(currentPath) && Directory.Exists(currentPath))
+            {
+                return currentPath;
+            }
+            return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        }
+
+        private object GetPropertyValue(string propertyName)
+        {
+            return GetType().GetProperty(propertyName)?.GetValue(this);
+        }
+
+        private void SetPropertyValue(string propertyName, object value)
+        {
+            GetType().GetProperty(propertyName)?.SetValue(this, value);
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class RelayCommand : ICommand
+    {
+        private readonly Action<object> _execute;
+        private readonly Predicate<object> _canExecute;
+
+        public RelayCommand(Action<object> execute, Predicate<object> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter) => _canExecute == null || _canExecute(parameter);
+
+        public void Execute(object parameter) => _execute(parameter);
+
+        public event EventHandler CanExecuteChanged
+        {
+            add => CommandManager.RequerySuggested += value;
+            remove => CommandManager.RequerySuggested -= value;
+        }
+    }
+}
+
+
+#########################################################
+//  <!-- Views/MainWindow.xaml --> 
+
+```xml
+<Window x:Class="EOTReminder.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:EOTReminder.ViewModels"
+        xmlns:conv="clr-namespace:EOTReminder.Converters"
+        xmlns:local="clr-namespace:EOTReminder.Views"
+        xmlns:p="clr-namespace:EOTReminder.Properties"
+        mc:Ignorable="d"
+        Title="Zmanim Reminder"
+        Width="950" Height="650"
+        Background="Transparent"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        WindowState="Maximized"
+        Topmost="True"
+        ResizeMode="NoResize">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <conv:ResourceToImageSourceConverter x:Key="ImageResourceConverter"/>
+        <conv:BoolToIntConverter x:Key="BoolToIntConverter"/>
+
+        <Style x:Key="TimeBoxStyle" TargetType="Border">
+            <Setter Property="Background" Value="#CCFFFFFF"/>
+            <Setter Property="CornerRadius" Value="15"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="BorderBrush" Value="#999"/>
+            <Setter Property="BorderThickness" Value="5"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BigTimeBoxStyle" TargetType="Border" BasedOn="{StaticResource TimeBoxStyle}">
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="BorderThickness" Value="6"/>
+            <Setter Property="Background" Value="#CCFFF3CD"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect ShadowDepth="4" Opacity="0.4" BlurRadius="8" Color="#FFD700"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- NEW: Style for Sefirat HaOmer rectangle -->
+        <Style x:Key="OmerBoxStyle" TargetType="Border" BasedOn="{StaticResource BigTimeBoxStyle}">
+            <Setter Property="Background">
+                <Setter.Value>
+                    <ImageBrush ImageSource="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=haomerBackground}" Stretch="UniformToFill"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="BorderThickness" Value="6"/>
+        </Style>
+
+        <Style x:Key="DescriptionTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+
+        <Style x:Key="TimeTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+
+        <Style x:Key="CountdownTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="Red"/>
+        </Style>
+
+        <Style x:Key="StatusTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="Red"/>
+        </Style>
+    </Window.Resources>
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Grid>
+        <Grid.Background>
+            <ImageBrush ImageSource="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=background}" Stretch="UniformToFill"/>
+        </Grid.Background>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="0.11*"/>
+            <RowDefinition Height="0.04*"/>
+            <RowDefinition Height="0.73*"/>
+            <RowDefinition Height="0.04"/>
+            <RowDefinition Height="0.12*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.05*"/>
+            <ColumnDefinition Width="0.9*"/>
+            <ColumnDefinition Width="0.05*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Row="0" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="100" Height="100" Background="Transparent"
+                MouseLeftButtonDown="HiddenOptionsButton_MouseLeftButtonDown"
+                Panel.ZIndex="100">
+        </Border>
+
+        <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="#F0F0F0" Padding="5">
+            <Grid Margin="5,5" HorizontalAlignment="Stretch">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.25*"/>
+                    <ColumnDefinition Width="0.125*"/>
+                    <ColumnDefinition Width="0.25*"/>
+                    <ColumnDefinition Width="0.125*"/>
+                    <ColumnDefinition Width="0.25*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Viewbox Grid.Column="0">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <TextBlock Text="שקיעה" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <TextBlock Text="{Binding Sunset}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+                <Viewbox Grid.Column="1">
+                    <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
+                </Viewbox>
+                <Viewbox Grid.Column="2">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <TextBlock Text="חצות" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <TextBlock Text="{Binding Midday}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+                <Viewbox Grid.Column="3">
+                    <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
+                </Viewbox>
+                <Viewbox Grid.Column="4">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <TextBlock Text="נץ החמה" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <TextBlock Text="{Binding Sunrise}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" Grid.Column="1">
+            <!-- NEW: Sefirat HaOmer display -->
+            <Border Style="{StaticResource OmerBoxStyle}" Visibility="{Binding IsSefiratHaOmer, Converter={StaticResource BoolToVisibility}}" Margin="10">
+                <Grid>
+                    <Viewbox>
+                        <TextBlock Text="{Binding SefiratHaOmerText}" FontSize="24" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                    </Viewbox>
+                </Grid>
+            </Border>
+
+            <!-- Normal 2x2 or 2x1 grid - visible only if no alert and not in Sefirat HaOmer -->
+            <ItemsControl ItemsSource="{Binding TimeSlots}"
+                          Visibility="{Binding IsSefiratHaOmer, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="{Binding Source={x:Static p:Settings.Default}, Path=UseSingleDeadline, Converter={StaticResource BoolToIntConverter}, ConverterParameter='1,2'}" Rows="2"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource TimeBoxStyle}" 
+                                BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}" 
+                                BorderThickness="9" Margin="25">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="0.015*"/>
+                                    <RowDefinition Height="0.21*"/>
+                                    <RowDefinition Height="0.01*"/>
+                                    <RowDefinition Height="0.54*"/>
+                                    <RowDefinition Height="0.01*"/>
+                                    <RowDefinition Height="0.21*"/>
+                                    <RowDefinition Height="0.015*"/>
+                                </Grid.RowDefinitions>
+                                <Viewbox Grid.Row="1">
+                                    <TextBlock Text="{Binding Description}" FontSize="14" FontWeight="Bold" TextAlignment="Center"/>
+                                </Viewbox>
+                                <Viewbox Grid.Row="3" MaxHeight="230">
+                                    <TextBlock Text="{Binding Time, StringFormat='HH:mm:ss'}" FontSize="52" TextAlignment="Center"/>
+                                </Viewbox>
+                                <Viewbox Grid.Row="5">
+                                    <TextBlock Text="{Binding PassedText}"
+                                               Foreground="Red"
+                                               FontSize="24"
+                                               FontWeight="Bold"
+                                               Visibility="{Binding IsPassed, Converter={StaticResource BoolToVisibility}}"
+                                               TextAlignment="Center"/>
+                                </Viewbox>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Alert mode - split top and bottom rows - visible only if alert is active and not in Sefirat HaOmer -->
+            <Grid Visibility="{Binding IsAlertActive, Converter={StaticResource BoolToVisibility}, ConverterParameter={Binding IsSefiratHaOmer, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1.5*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <ItemsControl ItemsSource="{Binding TopSlots}" Grid.Row="0" Padding="5">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="1" Rows="1"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="0.28*"/>
+                                    <ColumnDefinition Width="0.44*"/>
+                                    <ColumnDefinition Width="0.28*"/>
+                                </Grid.ColumnDefinitions>
+                                <Viewbox Grid.Column="0" HorizontalAlignment="Right">
+                                    <Image Width="180" Height="500"
+                                           Source="/Assets/sandclock.png"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Center"
+                                           Visibility="Visible"
+                                           Stretch="Uniform"/>
+                                </Viewbox>
+                                <Border Grid.Column="1" Margin="0,0,0,8"
+                                        Style="{StaticResource BigTimeBoxStyle}" 
+                                        BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="0.015*"/>
+                                            <RowDefinition Height="0.15*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.4*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.4*"/>
+                                            <RowDefinition Height="0.015*"/>
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Grid.Row="1" MaxHeight="72">
+                                            <TextBlock Text="{Binding Description}" FontSize="18" FontWeight="Bold" TextAlignment="Center"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Row="3" MaxHeight="200">
+                                            <TextBlock Text="{Binding Time, StringFormat='HH:mm:ss'}" FontSize="85" TextAlignment="Center"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Row="5" MaxHeight="200">
+                                            <TextBlock Text="{Binding CountdownText, Mode=OneWay}" FontSize="85" Foreground="Red" TextAlignment="Center"/>
+                                        </Viewbox>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <ItemsControl ItemsSource="{Binding BottomSlots}" Grid.Row="1" Padding="2">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="{Binding Source={x:Static p:Settings.Default}, Path=UseSingleDeadline, Converter={StaticResource BoolToIntConverter}, ConverterParameter='1,3'}" Rows="1"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Border Margin="5,8,5,8"
+                                        Style="{StaticResource TimeBoxStyle}" 
+                                        BorderBrush="{Binding Highlight, Converter={StaticResource BoolToBrushConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="0.015*"/>
+                                            <RowDefinition Height="0.21*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.54*"/>
+                                            <RowDefinition Height="0.01*"/>
+                                            <RowDefinition Height="0.21*"/>
+                                            <RowDefinition Height="0.015*"/>
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Grid.Row="1">
+                                            <TextBlock Text="{Binding Description}" FontSize="14" FontWeight="Bold" TextAlignment="Center"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Row="3" MaxHeight="230">
+                                            <TextBlock Text="{Binding Time, StringFormat='HH:mm:ss'}" FontSize="52" TextAlignment="Center"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Row="5">
+                                            <TextBlock Text="{Binding PassedText}"
+                                                       Foreground="Red"
+                                                       FontSize="24"
+                                                       FontWeight="Bold"
+                                                       Visibility="{Binding IsPassed, Converter={StaticResource BoolToVisibility}}"
+                                                       TextAlignment="Center"/>
+                                        </Viewbox>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Background="#F0F0F0">
+            <Grid Margin="5,0" HorizontalAlignment="Stretch">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.25*"/>
+                    <ColumnDefinition Width="0.25*"/>
+                    <ColumnDefinition Width="0.25*"/>
+                    <ColumnDefinition Width="0.25*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Viewbox Grid.Column="0">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <TextBlock Text="תאריך עברי" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <TextBlock Text="{Binding HebrewDate}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+                
+                <Viewbox Grid.Column="1">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <TextBlock Text="תאריך" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <TextBlock Text="{Binding TodayDate}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+                
+                <Viewbox Grid.Column="2">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <Viewbox MaxHeight="40">
+                            <TextBlock Text="שעה" FontSize="12"/>
+                        </Viewbox>
+                        <Viewbox MaxHeight="50">
+                            <TextBlock Text="{Binding CurrentTime}" FontSize="12" FontWeight="Bold"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Viewbox>
+                
+                <Viewbox Grid.Column="3">
+                    <Image Width="48" Height="48" Margin="10,0" Source="{Binding Converter={StaticResource ImageResourceConverter}, ConverterParameter=clock}" VerticalAlignment="Center"/>
+                </Viewbox>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
+```
+
+#########################################################
+//  <!-- Views/MainWindow.xaml.cs --> 
+
+
+
+// Views/MainWindow.xaml.cs
+
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using EOTReminder.ViewModels;
+using WorkspaceTask;
+
+namespace EOTReminder.Views
+{
+    public partial class MainWindow : Window
+    {
+        private MainViewModel _viewModel => DataContext as MainViewModel;
+
+        public MainWindow()
+        {
+            Loaded += MainWindow_Loaded;
+            Closing += MainWindow_Closing;
+           // _viewModel.InitializeData();
+            InitializeComponent();
+        }
+        
+        // Optional: Language switcher handler if you add ComboBox in XAML later
+        private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems[0] is ComboBoxItem selected)
+            {
+                string lang = selected.Tag?.ToString();
+                if (!string.IsNullOrWhiteSpace(lang))
+                    _viewModel?.SwitchLanguage(lang);
+            }
+        }
+
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            // Ensure the timer is stopped when the window is closing
+            _viewModel?.StopTimer();
+        }
+
+        private void HiddenOptionsButton_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // This will open the options page
+            OpenOptionsPage();
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Now that the main window is loaded, it's safe to check IsFirstRun
+            // and open the OptionsWindow if necessary.
+            // if (Properties.Settings.Default.IsFirstRun)
+            // {
+            //     OpenOptionsPage();
+            //     Properties.Settings.Default.IsFirstRun = false;
+            //     Properties.Settings.Default.Save();
+            // }
+
+            // Initialize ViewModel data after settings are potentially loaded/updated
+            // This ensures the Excel path from settings is available.
+           
+        }
+        private void OpenOptionsPage()
+        {
+            OptionsWindow optionsWindow = new OptionsWindow();
+            optionsWindow.Owner = this; // Set the main window as the owner
+            optionsWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            optionsWindow.ShowDialog(); // Show as dialog to block main window until closed
+        }
+    }
+}
+
+
+
+
+#########################################################
+//  <!-- Views/OptionsWindow.xaml --> 
+
+<Window x:Class="EOTReminder.Views.OptionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:EOTReminder.ViewModels"
+        mc:Ignorable="d"
+        Title="Application Options" Height="650" Width="600"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="ToolWindow"
+        ResizeMode="NoResize">
+    <Window.DataContext>
+        <vm:OptionsViewModel/>
+    </Window.DataContext>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <!-- NEW: Added rows for new settings -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Excel File Path:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ExcelFilePath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="0" Grid.Column="2" Content="Browse..." Command="{Binding BrowseExcelCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="First Audio Alert (minutes before):" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding FirstAlertMinutes, UpdateSourceTrigger=PropertyChanged}" Margin="5" Width="150" HorizontalAlignment="Left"/>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Second Audio Alert (minutes before):" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SecondAlertMinutes, UpdateSourceTrigger=PropertyChanged}" Margin="5" Width="150" HorizontalAlignment="Left"/>
+
+        <TextBlock Grid.Row="5" Grid.Column="0" Text="Visual Alert (minutes before):" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding VisualAlertMinutes, UpdateSourceTrigger=PropertyChanged}" Margin="5" Width="150" HorizontalAlignment="Left"/>
+
+        <TextBlock Grid.Row="7" Grid.Column="0" Text="EOS1 First Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding EOS1FirstAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="7" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS1FirstAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="9" Grid.Column="0" Text="EOS1 Second Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="9" Grid.Column="1" Text="{Binding EOS1SecondAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="9" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS1SecondAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="12" Grid.Column="0" Text="EOS2 First Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="12" Grid.Column="1" Text="{Binding EOS2FirstAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="12" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS2FirstAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="14" Grid.Column="0" Text="EOS2 Second Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="14" Grid.Column="1" Text="{Binding EOS2SecondAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="14" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS2SecondAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="17" Grid.Column="0" Text="EOT1 First Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="17" Grid.Column="1" Text="{Binding EOT1FirstAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="17" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOT1FirstAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="19" Grid.Column="0" Text="EOT1 Second Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="19" Grid.Column="1" Text="{Binding EOT1SecondAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="19" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOT1SecondAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="22" Grid.Column="0" Text="EOT2 First Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="22" Grid.Column="1" Text="{Binding EOT2FirstAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="22" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOT2FirstAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="24" Grid.Column="0" Text="EOT2 Second Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="24" Grid.Column="1" Text="{Binding EOT2SecondAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <Button Grid.Row="24" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOT2SecondAlertCommand}" Margin="5" Width="80"/>
+
+        <TextBlock Grid.Row="27" Grid.Column="0" Text="Alert on Shabbos:" Margin="5" VerticalAlignment="Center"/>
+        <CheckBox Grid.Row="27" Grid.Column="1" IsChecked="{Binding AlertOnShabbos}" Margin="5" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+
+        <!-- NEW: Single Deadline Checkbox -->
+        <TextBlock Grid.Row="28" Grid.Column="0" Text="Use Single Deadline (EOS1 & EOT1 only):" Margin="5" VerticalAlignment="Center"/>
+        <CheckBox Grid.Row="28" Grid.Column="1" IsChecked="{Binding UseSingleDeadline}" Margin="5" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+
+        <!-- NEW: Sefirat HaOmer Checkbox -->
+        <TextBlock Grid.Row="29" Grid.Column="0" Text="Show Sefirat HaOmer:" Margin="5" VerticalAlignment="Center"/>
+        <CheckBox Grid.Row="29" Grid.Column="1" IsChecked="{Binding SefiratHaOmerEnabled}" Margin="5" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+
+        <Grid Grid.Row="31" Grid.ColumnSpan="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+                <Button Content="Save Settings" 
+                        Command="{Binding SaveSettingsCommand}" 
+                        CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" 
+                        Margin="0,0,10,0" Padding="10,5"/>
+                <Button Content="Cancel" 
+                        Command="{Binding CloseSettingsCommand}" 
+                        CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" 
+                        Padding="10,5"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                <Button Content="Close Application" Command="{Binding CloseApplicationCommand}" CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" Padding="10,5"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
+
+#########################################################
+//  <!-- Views/OptionsWindow.xaml.cs --> 
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+
+namespace EOTReminder.Views
+{
+    /// <summary>
+    /// Interaction logic for OptionsWindow.xaml
+    /// </summary>
+    public partial class OptionsWindow : Window
+    {
+        public OptionsWindow()
+        {
+            InitializeComponent();
+        }
+    }
+}
+
+
+
+#########################################################
+//  <!--  App.xaml --> 
+
+
+
+<Application x:Class="EOTReminder.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:EOTReminder"
+             xmlns:conv="clr-namespace:EOTReminder.Converters"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <conv:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+
+        <!-- Define Font Families -->
+        <FontFamily x:Key="AlphaRegular">pack://application:,,,/Fonts/#Alpha Regular</FontFamily>
+        <FontFamily x:Key="AlphaBold">pack://application:,,,/Fonts/#Alpha Bold</FontFamily>
+
+        <!-- Default TextBlock style (regular) -->
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AlphaRegular}" />
+        </Style>
+
+        <!-- Optional: Bold style for special use -->
+        <Style x:Key="BoldTextBlock" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AlphaBold}" />
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+    </Application.Resources>
+</Application>
+
+
+
+
+
+#########################################################
+//  <!--  FodyWeavers.xml --> 
+
+
+<Weavers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="FodyWeavers.xsd">
+  <Costura />
+</Weavers>
+
+
+#########################################################
+//  <!--  packages.config --> 
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<packages>
+  <package id="Costura.Fody" version="6.0.0" targetFramework="net472" developmentDependency="true" />
+  <package id="ExcelDataReader" version="3.7.0" targetFramework="net472" />
+  <package id="ExcelDataReader.DataSet" version="3.7.0" targetFramework="net472" />
+  <package id="Fody" version="6.8.2" targetFramework="net472" developmentDependency="true" />
+  <package id="Microsoft.IO.RecyclableMemoryStream" version="3.0.1" targetFramework="net472" />
+  <package id="System.Buffers" version="4.5.1" targetFramework="net472" />
+  <package id="System.ComponentModel.Annotations" version="5.0.0" targetFramework="net472" />
+  <package id="System.Memory" version="4.5.5" targetFramework="net472" />
+  <package id="System.Numerics.Vectors" version="4.5.0" targetFramework="net472" />
+  <package id="System.Runtime.CompilerServices.Unsafe" version="6.0.0" targetFramework="net472" />
+  <package id="System.Security.Cryptography.Xml" version="8.0.2" targetFramework="net472" />
+  <package id="System.Text.Encoding.CodePages" version="9.0.6" targetFramework="net472" />
+</packages>
+
+
+############################################################
+Settings designer
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by a tool.
+//     Runtime Version:4.0.30319.42000
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+namespace EOTReminder.Properties {
+    using System;
+    
+    [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.6.0.0")]
+    internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
+        
+        private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
+        
+        public static Settings Default {
+            get {
+                return defaultInstance;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ExcelFilePath {
+            get {
+                return ((string)(this["ExcelFilePath"]));
+            }
+            set {
+                this["ExcelFilePath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("10")]
+        public int FirstAlertMinutes {
+            get {
+                return ((int)(this["FirstAlertMinutes"]));
+            }
+            set {
+                this["FirstAlertMinutes"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int SecondAlertMinutes {
+            get {
+                return ((int)(this["SecondAlertMinutes"]));
+            }
+            set {
+                this["SecondAlertMinutes"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EOS1FirstAlertPath {
+            get {
+                return ((string)(this["EOS1FirstAlertPath"]));
+            }
+            set {
+                this["EOS1FirstAlertPath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EOS1SecondAlertPath {
+            get {
+                return ((string)(this["EOS1SecondAlertPath"]));
+            }
+            set {
+                this["EOS1SecondAlertPath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EOS2FirstAlertPath {
+            get {
+                return ((string)(this["EOS2FirstAlertPath"]));
+            }
+            set {
+                this["EOS2FirstAlertPath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EOS2SecondAlertPath {
+            get {
+                return ((string)(this["EOS2SecondAlertPath"]));
+            }
+            set {
+                this["EOS2SecondAlertPath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("30")]
+        public int VisualAlertMinutes {
+            get {
+                return ((int)(this["VisualAlertMinutes"]));
+            }
+            set {
+                this["VisualAlertMinutes"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AlertOnShabbos {
+            get {
+                return ((bool)(this["AlertOnShabbos"]));
+            }
+            set {
+                this["AlertOnShabbos"] = value;
+            }
+        }
+        
+        // New settings
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool UseSingleDeadline {
+            get {
+                return ((bool)(this["UseSingleDeadline"]));
+            }
+            set {
+                this["UseSingleDeadline"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool SefiratHaOmerEnabled {
+            get {
+                return ((bool)(this["SefiratHaOmerEnabled"]));
+            }
+            set {
+                this["SefiratHaOmerEnabled"] = value;
+            }
+        }
+    }
+}
+
+
+#########################################################################
+settings.settings
+
+<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="EOTReminder.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="ExcelFilePath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="FirstAlertMinutes" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">10</Value>
+    </Setting>
+    <Setting Name="SecondAlertMinutes" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">3</Value>
+    </Setting>
+    <Setting Name="EOS1FirstAlertPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="EOS1SecondAlertPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="EOS2FirstAlertPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="EOS2SecondAlertPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="VisualAlertMinutes" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">30</Value>
+    </Setting>
+    <Setting Name="AlertOnShabbos" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <!-- New settings -->
+    <Setting Name="UseSingleDeadline" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="SefiratHaOmerEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
+
+#############################################################################

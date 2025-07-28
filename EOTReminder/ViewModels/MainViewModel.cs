@@ -29,33 +29,52 @@ namespace EOTReminder.ViewModels
         public ObservableCollection<TimeSlot> BottomSlots { get; } = new ObservableCollection<TimeSlot>();
 
         private bool _isAlertActive;
-        private DateTime _lastExcelReloadDate = DateTime.MinValue;
-        private bool _hasReloadedForCurrentSunriseCycle = false;
-        // Stores the sunrise time for which data is currently loaded
-        private DateTime _currentSunriseForReloadCheck = DateTime.MinValue;
-
-        public bool IsAlertActive // Controls visibility of normal 2x2 grid vs. alert layout
-        {
-            get => _isAlertActive;
-            set { _isAlertActive = value; OnPropertyChanged(); }
-        }
-
         private bool _isAlertNotActive;
-        public bool IsAlertNotActive // Controls visibility of normal 2x2 grid vs. alert layout
-        {
-            get => _isAlertNotActive;
-            set { _isAlertNotActive = value; OnPropertyChanged(); }
-        }
-
-        public string TodayDate => DateTime.Now.ToString("dd/MM/yyyy");
-        public string CurrentTime => DateTime.Now.ToString("HH:mm:ss");
-
+        private bool _hasReloadedForCurrentSunriseCycle;
+        private Timer _timer;
         // Private DateTime fields to hold the actual time values for calculations
         private DateTime _internalSunriseTime;
         private DateTime _internalMiddayTime;
         private DateTime _internalSunsetTime;
-        private string _hebrewDateString; // Private field for Hebrew date string
+        private DateTime _reloadTriggerTime;
 
+        private string _hebrewDateString; // Private field for Hebrew date string
+        private string _currentLang = "he"; // Default to Hebrew as per original code
+        private readonly Dictionary<string, Dictionary<string, string>> _translations =
+            new Dictionary<string, Dictionary<string, string>>()
+            {
+                ["en"] = new Dictionary<string, string>()
+                {
+                    ["a2EOS1"] = "End of Shema 1", // Added numbers for clarity
+                    ["a1EOS2"] = "End of Shema 2",
+                    ["b2EOT1"] = "End of Prayer 1",
+                    ["b1EOT2"] = "End of Prayer 2",
+                    ["Passed"] = "Passed"
+                },
+                ["he"] = new Dictionary<string, string>()
+                {
+                    ["a2EOS1"] = "סו\"ז קר\"ש מג\"א",
+                    ["a1EOS2"] = "סו\"ז קר\"ש תניא גר\"א",
+                    ["b2EOT1"] = "סו\"ז תפילה מג\"א",
+                    ["b1EOT2"] = "סו\"ז תפילה תניא גר\"א",
+                    ["Passed"] = "עבר זמנו", // Corrected key to "Passed"
+                }
+            };
+
+        // Controls visibility of normal 2x2 grid vs. alert layout
+        public bool IsAlertActive 
+        {
+            get => _isAlertActive;
+            set { _isAlertActive = value; OnPropertyChanged(); }
+        }
+        // Controls visibility of normal 2x2 grid vs. alert layout
+        public bool IsAlertNotActive 
+        {
+            get => _isAlertNotActive;
+            set { _isAlertNotActive = value; OnPropertyChanged(); }
+        }
+        public string TodayDate => DateTime.Now.ToString("dd/MM/yyyy");
+        public string CurrentTime => DateTime.Now.ToString("HH:mm:ss");
         // Public string properties for UI binding
         public string HebrewDate
         {
@@ -80,36 +99,18 @@ namespace EOTReminder.ViewModels
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private Timer _timer;
-        private string _currentLang = "he"; // Default to Hebrew as per original code
-
-        private readonly Dictionary<string, Dictionary<string, string>> _translations =
-            new Dictionary<string, Dictionary<string, string>>()
-            {
-                ["en"] = new Dictionary<string, string>()
-                {
-                    ["a2EOS1"] = "End of Shema 1", // Added numbers for clarity
-                    ["a1EOS2"] = "End of Shema 2",
-                    ["b2EOT1"] = "End of Prayer 1",
-                    ["b1EOT2"] = "End of Prayer 2",
-                    ["Passed"] = "Passed"
-                },
-                ["he"] = new Dictionary<string, string>()
-                {
-                    ["a2EOS1"] = "סו\"ז קר\"ש מג\"א",
-                    ["a1EOS2"] = "סו\"ז קר\"ש תניא גר\"א",
-                    ["b2EOT1"] = "סו\"ז תפילה מג\"א",
-                    ["b1EOT2"] = "סו\"ז תפילה תניא גר\"א",
-                    ["Passed"] = "עבר זמנו", // Corrected key to "Passed"
-                }
-            };
-        
         public MainViewModel()
         {
+            IsAlertActive = false;
+            IsAlertNotActive = true;
+            _hasReloadedForCurrentSunriseCycle = false;
+
             // Required for ExcelDataReader to handle older Excel formats
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
             LoadFromExcel();
             InitTimer();
+
+            _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));            
         }
 
         public void InitializeData()
@@ -196,36 +197,35 @@ namespace EOTReminder.ViewModels
                                 
                                 slot.AlertFlags["3"] = true;
                             }
-
-                            // Step 1: Ensure _internalSunriseTime is always updated for the current Gregorian day.
-                            // This is crucial if the application runs continuously past midnight,
-                            // as _internalSunriseTime would otherwise remain from the previous day.
-                            if (_internalSunriseTime.Date != DateTime.Today)
-                            {
-                                // It's a new Gregorian day, or _internalSunriseTime hasn't been updated for today yet.
-                                // Reload Excel data to get the correct sunrise time for today.
-                                _hasReloadedForCurrentSunriseCycle = false; // Reset the flag for the new day's cycle
-                                _currentSunriseForReloadCheck = _internalSunriseTime; // Store this sunrise time as the basis for the current cycle
-                                Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
-                            }
-
-                            // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
-                            // Step 2: Calculate the specific reload trigger time for today's sunrise.
-                            DateTime reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
-
-                            // Step 3: Check if it's time to perform the scheduled daily reload (72 minutes before sunrise).
-                            // This condition ensures:
-                            // 1. The current time is past the calculated trigger time.
-                            // 2. We haven't already reloaded for *this specific sunrise cycle*.
-                            //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
-                            if (DateTime.Now >= reloadTriggerTime && !_hasReloadedForCurrentSunriseCycle)
-                            {
-                                Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {reloadTriggerTime:HH:mm:ss}");
-                                LoadFromExcel(); // Perform the actual scheduled reload
-                                _hasReloadedForCurrentSunriseCycle = true; // Mark that reload has happened for this cycle
-                                _currentSunriseForReloadCheck = _internalSunriseTime; // Update the marker to the new sunrise time after reload
-                            }
                         }
+                    }
+
+                    // Step 1: Ensure _internalSunriseTime is always updated for the current Gregorian day.
+                    // This is crucial if the application runs continuously past midnight,
+                    // as _internalSunriseTime would otherwise remain from the previous day.
+                    if (_internalSunriseTime.Date != DateTime.Today && _hasReloadedForCurrentSunriseCycle)
+                    {
+                        // It's a new Gregorian day, or _internalSunriseTime hasn't been updated for today yet.
+                        // Reload Excel data to get the correct sunrise time for today.
+                        _hasReloadedForCurrentSunriseCycle = false; // Reset the flag for the new day's cycle
+
+                        // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
+                        // Step 2: Calculate the specific reload trigger time for today's sunrise.
+                        _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
+
+                        Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
+                    }
+
+                    // Step 3: Check if it's time to perform the scheduled daily reload (72 minutes before sunrise).
+                    // This condition ensures:
+                    // 1. The current time is past the calculated trigger time.
+                    // 2. We haven't already reloaded for *this specific sunrise cycle*.
+                    //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
+                    if (DateTime.Now >= _reloadTriggerTime && !_hasReloadedForCurrentSunriseCycle)
+                    {
+                        Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {_reloadTriggerTime:HH:mm:ss}");
+                        LoadFromExcel(); // Perform the actual scheduled reload
+                        _hasReloadedForCurrentSunriseCycle = true; // Mark that reload has happened for this cycle
                     }
 
                     IsAlertNotActive = !IsAlertActive;
@@ -240,13 +240,19 @@ namespace EOTReminder.ViewModels
 
         private void LoadFromExcel()
         {
+            TimeSlots.Clear(); // Clear existing slots before Loading
+
             string path = Properties.Settings.Default.ExcelFilePath;
           
             if (!File.Exists(path))
             {
-                Logger.LogWarning($"Excel file '{path}' not found. Loading mock data.");
-                LoadMock();
-                return;
+                path = @"C:\DailyTimes.xlsx";
+                if (!File.Exists(path))
+                {
+                    Logger.LogWarning($"Excel file '{path}' not found. Loading mock data.");
+                    LoadMock();
+                    return;
+                }
             }
 
             try

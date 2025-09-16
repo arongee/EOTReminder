@@ -87,10 +87,10 @@
             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ExcelFilePath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
             <Button Grid.Row="0" Grid.Column="2" Content="Browse..." Command="{Binding BrowseExcelCommand}" Margin="5" Width="80"/>
 
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="First Audio Alert (minutes before):" Margin="5" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="דקות לפני זמן קרי''ש להפעיל תקליט ראשון" Margin="5" VerticalAlignment="Center"/>
             <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding FirstAlertMinutes, UpdateSourceTrigger=PropertyChanged}" Margin="5" Width="150" HorizontalAlignment="Left"/>
 
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Second Audio Alert (minutes before):" Margin="5" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="דקות לפני זמן קרי''ש להפעיל תקליט שני" Margin="5" VerticalAlignment="Center"/>
             <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SecondAlertMinutes, UpdateSourceTrigger=PropertyChanged}" Margin="5" Width="150" HorizontalAlignment="Left"/>
 
             <!-- New Settings -->
@@ -98,20 +98,20 @@
             <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding VisualAlertMinutes, UpdateSourceTrigger=PropertyChanged}" Margin="5" Width="150" HorizontalAlignment="Left"/>
 
             <!-- EOS1 Alert Paths -->
-            <TextBlock Grid.Row="7" Grid.Column="0" Text="EOS1 First Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="7" Grid.Column="0" Text="תקליט ראשון של סוף זמן ראשון" Margin="5" VerticalAlignment="Center"/>
             <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding EOS1FirstAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
             <Button Grid.Row="7" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS1FirstAlertCommand}" Margin="5" Width="80"/>
 
-            <TextBlock Grid.Row="9" Grid.Column="0" Text="EOS1 Second Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="9" Grid.Column="0" Text="תקליט שני של סוף זמן ראשון" Margin="5" VerticalAlignment="Center"/>
             <TextBox Grid.Row="9" Grid.Column="1" Text="{Binding EOS1SecondAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
             <Button Grid.Row="9" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS1SecondAlertCommand}" Margin="5" Width="80"/>
 
             <!-- EOS2 Alert Paths -->
-            <TextBlock Grid.Row="12" Grid.Column="0" Text="EOS2 First Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="12" Grid.Column="0" Text="תקליט ראשון של סוף זמן שני" Margin="5" VerticalAlignment="Center"/>
             <TextBox Grid.Row="12" Grid.Column="1" Text="{Binding EOS2FirstAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
             <Button Grid.Row="12" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS2FirstAlertCommand}" Margin="5" Width="80"/>
 
-            <TextBlock Grid.Row="14" Grid.Column="0" Text="EOS2 Second Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="14" Grid.Column="0" Text="תקליט שני של סוף זמן שני" Margin="5" VerticalAlignment="Center"/>
             <TextBox Grid.Row="14" Grid.Column="1" Text="{Binding EOS2SecondAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
             <Button Grid.Row="14" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOS2SecondAlertCommand}" Margin="5" Width="80"/>
 
@@ -125,7 +125,7 @@
             <Button Grid.Row="19" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOT1SecondAlertCommand}" Margin="5" Width="80"/>
 
             <!-- EOT2 Alert Paths -->
-            <TextBlock Grid.Row="22" Grid.Column="0" Text="EOT2 First Alert Audio:" Margin="5" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="22" Grid.Column="0" Text="תקליט ראשון לסוף זמן תפילה שני" Margin="5" VerticalAlignment="Center"/>
             <TextBox Grid.Row="22" Grid.Column="1" Text="{Binding EOT2FirstAlertPath, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
             <Button Grid.Row="22" Grid.Column="2" Content="Browse..." Command="{Binding BrowseEOT2FirstAlertCommand}" Margin="5" Width="80"/>
 
@@ -148,18 +148,20 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
-                <Button Content="Save Settings" 
-                        Command="{Binding SaveSettingsCommand}" 
-                        CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" 
-                        Margin="0,0,10,0" Padding="10,5"/>
-                <Button Content="Cancal" 
-                        Command="{Binding CloseSettingsCommand}" 
-                        CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" 
-                        Padding="10,5"/>
-            </StackPanel>
+                    <Button Content="Save Settings" 
+                            Command="{Binding SaveSettingsCommand}" 
+                            CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" 
+                            Margin="0,0,10,0" Padding="10,5"/>
+                    <Button Content="Cancal" 
+                            Command="{Binding CloseSettingsCommand}" 
+                            CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" 
+                            Padding="10,5"/>
+                </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-                <Button Content="Close Application" Command="{Binding CloseApplicationCommand}" CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" Padding="10,5"/>
+                    <Button Content="Close Application" Command="{Binding CloseApplicationCommand}" CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" Padding="10,5"/>
+                    <Button Content="Minimize Application" Command="{Binding MinimizeApplicationCommand}" CommandParameter="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" Padding="10,5"/>
+               
                 </StackPanel>
             </Grid>
         </Grid>

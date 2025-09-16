@@ -16,14 +16,24 @@ namespace EOTReminder.ViewModels
         public int FirstAlertMinutes
         {
             get => _firstAlertMinutes;
-            set { _firstAlertMinutes = value; OnPropertyChanged(); }
+            set
+            {
+                _firstAlertMinutes = value; OnPropertyChanged();
+                Properties.Settings.Default.FirstAlertMinutes = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private int _secondAlertMinutes;
         public int SecondAlertMinutes
         {
             get => _secondAlertMinutes;
-            set { _secondAlertMinutes = value; OnPropertyChanged(); }
+            set
+            {
+                _secondAlertMinutes = value; OnPropertyChanged();
+                Properties.Settings.Default.SecondAlertMinutes = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private string _excelFilePath;
@@ -38,28 +48,48 @@ namespace EOTReminder.ViewModels
         public string EOS1FirstAlertPath
         {
             get => _eos1FirstAlertPath;
-            set { _eos1FirstAlertPath = value; OnPropertyChanged(); }
+            set
+            {
+                _eos1FirstAlertPath = value; OnPropertyChanged();
+                Properties.Settings.Default.EOS1FirstAlertPath = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private string _eos1SecondAlertPath;
         public string EOS1SecondAlertPath
         {
             get => _eos1SecondAlertPath;
-            set { _eos1SecondAlertPath = value; OnPropertyChanged(); }
+            set
+            {
+                _eos1SecondAlertPath = value; OnPropertyChanged();
+                Properties.Settings.Default.EOS1SecondAlertPath = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private string _eos2FirstAlertPath;
         public string EOS2FirstAlertPath
         {
             get => _eos2FirstAlertPath;
-            set { _eos2FirstAlertPath = value; OnPropertyChanged(); }
+            set
+            {
+                _eos2FirstAlertPath = value; OnPropertyChanged();
+                Properties.Settings.Default.EOS2FirstAlertPath = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private string _eos2SecondAlertPath;
         public string EOS2SecondAlertPath
         {
             get => _eos2SecondAlertPath;
-            set { _eos2SecondAlertPath = value; OnPropertyChanged(); }
+            set
+            {
+                _eos2SecondAlertPath = value; OnPropertyChanged();
+                Properties.Settings.Default.EOS2SecondAlertPath = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private string _eot1FirstAlertPath;
@@ -80,14 +110,24 @@ namespace EOTReminder.ViewModels
         public string EOT2FirstAlertPath
         {
             get => _eot2FirstAlertPath;
-            set { _eot2FirstAlertPath = value; OnPropertyChanged(); }
+            set
+            {
+                _eot2FirstAlertPath = value; OnPropertyChanged();
+                Properties.Settings.Default.EOT2FirstAlertPath = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private string _eot2SecondAlertPath;
         public string EOT2SecondAlertPath
         {
             get => _eot2SecondAlertPath;
-            set { _eot2SecondAlertPath = value; OnPropertyChanged(); }
+            set
+            {
+                _eot2SecondAlertPath = value; OnPropertyChanged();
+                Properties.Settings.Default.EOT2SecondAlertPath = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         // NEW: Visual Alert Minutes
@@ -95,7 +135,12 @@ namespace EOTReminder.ViewModels
         public int VisualAlertMinutes
         {
             get => _visualAlertMinutes;
-            set { _visualAlertMinutes = value; OnPropertyChanged(); }
+            set
+            {
+                _visualAlertMinutes = value; OnPropertyChanged();
+                Properties.Settings.Default.VisualAlertMinutes = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         // NEW: Alert on Shabbos
@@ -103,12 +148,18 @@ namespace EOTReminder.ViewModels
         public bool AlertOnShabbos
         {
             get => _alertOnShabbos;
-            set { _alertOnShabbos = value; OnPropertyChanged(); }
+            set
+            {
+                _alertOnShabbos = value; OnPropertyChanged();
+                Properties.Settings.Default.AlertOnShabbos = value;
+                Properties.Settings.Default.Save();
+            }
         }
 
         // Commands
         public ICommand SaveSettingsCommand { get; }
         public ICommand CloseApplicationCommand { get; }
+        public ICommand MinimizeApplicationCommand { get; }
         public ICommand CloseSettingsCommand { get; } // NEW: Command for closing settings window
         public ICommand BrowseExcelCommand { get; }
         // NEW: Browse Commands for Audio Paths
@@ -127,6 +178,7 @@ namespace EOTReminder.ViewModels
             LoadSettings();
             SaveSettingsCommand = new RelayCommand(SaveSettings);
             CloseApplicationCommand = new RelayCommand(CloseApplication);
+            MinimizeApplicationCommand = new RelayCommand(MinimizeApplication);
             CloseSettingsCommand = new RelayCommand(CloseSettings); // Initialize new command
             BrowseExcelCommand = new RelayCommand(BrowseExcelFile);
             // NEW: Initialize Browse Commands for Audio Paths
@@ -203,6 +255,16 @@ namespace EOTReminder.ViewModels
                 window.Close();
             }
             Application.Current.Shutdown();
+        }
+
+        private void MinimizeApplication(object parameter)
+        {
+            Logger.LogInfo("Application minimize requested from options window.");
+            if (parameter is Window window)
+            {
+                window.Close();
+            }
+            Application.Current.MainWindow.WindowState = WindowState.Minimized;
         }
 
         private void BrowseExcelFile(object parameter)

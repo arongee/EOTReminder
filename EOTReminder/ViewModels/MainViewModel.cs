@@ -115,7 +115,7 @@ namespace EOTReminder.ViewModels
             LoadFromExcel();
             InitTimer();
 
-            _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
+            _reloadTriggerTime = DateTime.Today.Add(new TimeSpan(0, 05, 0));
         }
 
         public void InitializeData()
@@ -136,6 +136,9 @@ namespace EOTReminder.ViewModels
 
                         int firstAlertMin = Properties.Settings.Default.FirstAlertMinutes;
                         int secondAlertMin = Properties.Settings.Default.SecondAlertMinutes;
+                        int firstTAlertMin = Properties.Settings.Default.FirstAlertTefilaMinutes;
+                        int secondTAlertMin = Properties.Settings.Default.SecondAlertTefilaMinutes;
+
                         int visualAlertMin = Properties.Settings.Default.VisualAlertMinutes;
 
                         if (!slot.IsPassed && slot.Countdown <= TimeSpan.Zero)
@@ -147,33 +150,34 @@ namespace EOTReminder.ViewModels
                             slot.ShowSandClock = false;
                             slot.IsIn30MinAlert = false; // Reset alert state
                             // Reset alert flags for this slot
-                            slot.AlertFlags["30"] = false;
-                            slot.AlertFlags["10"] = false;
-                            slot.AlertFlags["3"] = false;
+                            slot.AlertFlags[Globals.Visual] = false;
+                            slot.AlertFlags[Globals.Shema1] = false;
+                            slot.AlertFlags[Globals.Shema2] = false;
+                            slot.AlertFlags[Globals.Tefila2] = false;
 
                             IsAlertActive = false;
                         }
                         else if (!slot.IsPassed)
                         {
                             // Time is still upcoming
-                            if (slot.Countdown.TotalMinutes <= visualAlertMin && !slot.AlertFlags["30"])
+                            if (slot.Countdown.TotalMinutes <= visualAlertMin && !slot.AlertFlags[Globals.Visual])
                             {
                                 IsAlertActive = true;
                                 // 30-minute alert trigger
                                 slot.IsIn30MinAlert = true; // This will trigger the UI layout change
                                 slot.Highlight = true;
                                 slot.ShowSandClock = true;
-                                slot.AlertFlags["30"] = true;
+                                slot.AlertFlags[Globals.Visual] = true;
                                 // No MessageBox for 30min visual alert, just the UI change
                             }
-                            else if (slot.Countdown.TotalMinutes > visualAlertMin && slot.AlertFlags["30"])
+                            else if (slot.Countdown.TotalMinutes > visualAlertMin && slot.AlertFlags[Globals.Visual])
                             {
                                 IsAlertActive = false;
                                 // If it was in 30min alert but now it's outside, reset
                                 slot.IsIn30MinAlert = false;
                                 slot.Highlight = false;
                                 slot.ShowSandClock = false;
-                                slot.AlertFlags["30"] = false; // Allow re-trigger if time is reset/reloaded
+                                slot.AlertFlags[Globals.Visual] = false; // Allow re-trigger if time is reset/reloaded
                             }
 
                             // Update countdown text for all active slots
@@ -181,26 +185,35 @@ namespace EOTReminder.ViewModels
                                 (int)Math.Floor(slot.Countdown.TotalMinutes),
                                 slot.Countdown.Seconds);
 
-                            // NEW: Lines 142-152 - Use settings for alert thresholds
+                            // Use settings for alert thresholds
                             if (firstAlertMin > 0 &&
                                 slot.Countdown.TotalMinutes <= firstAlertMin &&
                                 slot.Countdown.TotalMinutes > (firstAlertMin - 1) && // Ensure it fires once per minute
-                                !slot.AlertFlags["10"])
+                                !slot.AlertFlags[Globals.Shema1])
                             {
                                 if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
-                                    PlayAlert(slot.Id, "10"); // Still pass "10" to choose the WAV file
-                                slot.AlertFlags["10"] = true;
+                                    PlayAlert(slot.Id, Globals.Shema1); // Still pass "10" to choose the WAV file
+                                slot.AlertFlags[Globals.Shema1] = true;
                             }
 
                             if (secondAlertMin > 0 &&
                                 slot.Countdown.TotalMinutes <= secondAlertMin &&
                                 slot.Countdown.TotalMinutes > (secondAlertMin - 1) && // Ensure it fires once per minute
-                                !slot.AlertFlags["3"])
+                                !slot.AlertFlags[Globals.Shema2])
                             {
                                 if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
-                                    PlayAlert(slot.Id, "3"); // Still pass "3" to choose the WAV file
+                                    PlayAlert(slot.Id, Globals.Shema2); // Still pass "3" to choose the WAV file
+                                slot.AlertFlags[Globals.Shema2] = true;
+                            }
 
-                                slot.AlertFlags["3"] = true;
+                            if (secondTAlertMin > 0 && 
+                                slot.Countdown.TotalMinutes <= secondTAlertMin &&
+                                slot.Countdown.TotalMinutes > (secondTAlertMin - 1) && // Ensure it fires once per minute
+                                !slot.AlertFlags[Globals.Tefila2] && (slot.Id == "b2EOT1" || slot.Id == "b1EOT2"))
+                            {
+                                if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
+                                    PlayAlert(slot.Id, Globals.Tefila2); // Still pass "3" to choose the WAV file
+                                slot.AlertFlags[Globals.Tefila2] = true;
                             }
                         }
                     }
@@ -216,7 +229,9 @@ namespace EOTReminder.ViewModels
 
                         // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
                         // Step 2: Calculate the specific reload trigger time for today's sunrise.
-                        _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
+                        TimeSpan timeOnly = new TimeSpan(0, 05, 0);
+                        _reloadTriggerTime = DateTime.Today.Add(timeOnly);
+                        //_reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
 
                         Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
                     }
@@ -368,10 +383,10 @@ namespace EOTReminder.ViewModels
                         TimeSlots.Clear();
 
                         // Add EOS/EOT slots
-                        AddSlot("a1EOS2", ParseTimeFromCell(todayRow, "EOS2"));
-                        AddSlot("a2EOS1", ParseTimeFromCell(todayRow, "EOS1"));
-                        AddSlot("b1EOT2", ParseTimeFromCell(todayRow, "EOT2"));
-                        AddSlot("b2EOT1", ParseTimeFromCell(todayRow, "EOT1"));
+                        AddSlot(Globals.EOS2, ParseTimeFromCell(todayRow, "EOS2"));
+                        AddSlot(Globals.EOS1, ParseTimeFromCell(todayRow, "EOS1"));
+                        AddSlot(Globals.EOT2, ParseTimeFromCell(todayRow, "EOT2"));
+                        AddSlot(Globals.EOT1, ParseTimeFromCell(todayRow, "EOT1"));
 
                         TimeSlots.OrderBy(s => s.Id);
                         //TimeSlots = TimeSlots.Reverse();
@@ -388,7 +403,9 @@ namespace EOTReminder.ViewModels
 
                         // Check for any parsing errors using the internal DateTime fields
                         if (TimeSlots.Any(s => s.Time == DateTime.MinValue) ||
-                            _internalSunriseTime == DateTime.MinValue || _internalMiddayTime == DateTime.MinValue || _internalSunsetTime == DateTime.MinValue)
+                            _internalSunriseTime == DateTime.MinValue || 
+                            _internalMiddayTime == DateTime.MinValue || 
+                            _internalSunsetTime == DateTime.MinValue)
                         {
                             Logger.LogWarning("Some times could not be parsed from Excel. Using mock data for missing values.");
                             // Optionally, you could try to fill in only the missing values with mock data here
@@ -405,7 +422,13 @@ namespace EOTReminder.ViewModels
             // Initialize alert triggers after data is set (either from Excel or mock)
             foreach (var slot in TimeSlots)
             {
-                slot.AlertFlags = new Dictionary<string, bool>() { ["30"] = false, ["10"] = false, ["3"] = false };
+                slot.AlertFlags = new Dictionary<string, bool>()
+                {
+                    [Globals.Visual] = false,
+                    [Globals.Shema1] = false,
+                    [Globals.Shema2] = false,
+                    [Globals.Tefila2] = false
+                };
             }
         }
 
@@ -445,33 +468,43 @@ namespace EOTReminder.ViewModels
                 ShowSandClock = false,
                 Highlight = false,
                 IsIn30MinAlert = false,
-                AlertFlags = new Dictionary<string, bool>() { ["30"] = false, ["10"] = false, ["3"] = false }
+                AlertFlags = new Dictionary<string, bool>() { 
+                    [Globals.Visual] = false, 
+                    [Globals.Shema1] = false, 
+                    [Globals.Shema2] = false,
+                    [Globals.Tefila2] = false
+                }
             });
         }
 
-        private void PlayAlert(string slotId, string minutesBefore)
+        private void PlayAlert(string slotId, string alertFlag)
         {
             // Option 1: Play from embedded resource (preferred)
             string fileName = String.Empty;
             string extFileName = String.Empty;
-            if (slotId == "a2EOS1" &&
-                minutesBefore == Properties.Settings.Default.FirstAlertMinutes.ToString() &&
+
+            if (slotId == Globals.EOS1 &&
+                alertFlag == Globals.Shema1 &&
                 !string.IsNullOrEmpty(Properties.Settings.Default.EOS1FirstAlertPath))
                 extFileName = Properties.Settings.Default.EOS1FirstAlertPath;
-            else if (slotId == "a2EOS1" &&
-                     minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
-                     !string.IsNullOrEmpty(Properties.Settings.Default.EOS1SecondAlertPath))
+            else if (slotId == Globals.EOS1 &&
+                alertFlag == Globals.Shema2 &&
+                !string.IsNullOrEmpty(Properties.Settings.Default.EOS1SecondAlertPath))
                 extFileName = Properties.Settings.Default.EOS1SecondAlertPath;
-            else if (slotId == "a1EOS2" &&
-                     minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
-                     !string.IsNullOrEmpty(Properties.Settings.Default.EOS2FirstAlertPath))
+            else if (slotId == Globals.EOS2 &&
+                alertFlag == Globals.Shema1 &&
+                !string.IsNullOrEmpty(Properties.Settings.Default.EOS2FirstAlertPath))
                 extFileName = Properties.Settings.Default.EOS2FirstAlertPath;
-            else if (slotId == "a1EOS2" &&
-                     minutesBefore == Properties.Settings.Default.SecondAlertMinutes.ToString() &&
-                     !string.IsNullOrEmpty(Properties.Settings.Default.EOS2SecondAlertPath))
+            else if (slotId == Globals.EOS2 &&
+                alertFlag == Globals.Shema2 &&
+                !string.IsNullOrEmpty(Properties.Settings.Default.EOS2SecondAlertPath))
                 extFileName = Properties.Settings.Default.EOS2SecondAlertPath;
+            else if(slotId == Globals.EOT2 &&
+                alertFlag == Globals.Tefila2 &&
+                !string.IsNullOrEmpty(Properties.Settings.Default.EOT2FirstAlertPath))
+                extFileName = Properties.Settings.Default.EOT2FirstAlertPath;
             else
-                fileName = $"alert{slotId}_{minutesBefore}.wav";
+                fileName = $"alert{slotId}_{alertFlag}.wav";
             try
             {
                 SoundPlayer player = null;
@@ -494,7 +527,7 @@ namespace EOTReminder.ViewModels
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Resource not found in Resources.resx. and settings not set for {slotId} alert {minutesBefore}");
+                    System.Diagnostics.Debug.WriteLine($"Resource not found in Resources.resx. and settings not set for {slotId} alert {alertFlag}");
                     return;
                 }
                 player.Play();

@@ -99,6 +99,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Converters\ResourceToImageSourceConverter.cs" />
+    <Compile Include="Utilities\Globals.cs" />
     <Compile Include="Utilities\Logger.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
     <Compile Include="ViewModels\OptionsViewModel.cs" />

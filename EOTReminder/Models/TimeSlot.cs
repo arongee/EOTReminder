@@ -1,6 +1,7 @@
 ﻿
 // Models/TimeSlot.cs
 
+using EOTReminder.Utilities;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -23,7 +24,12 @@ namespace EOTReminder.Models
         public DateTime Time { get; set; }
 
         public Dictionary<string, bool> AlertFlags { get; set; } = new Dictionary<string, bool>()
-            {["30"] = false, ["10"] = false, ["3"] = false};
+        {
+            [Globals.Visual] = false,
+            [Globals.Shema1] = false,
+            [Globals.Shema2] = false,
+            [Globals.Tefila2] = false
+        };
 
         public string Description
         {

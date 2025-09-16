@@ -118,16 +118,16 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="alerta2EOS1_10" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="alerta2EOS1_kr1" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Assets\alertEOS1_10.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="alerta2EOS1_3" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="alerta2EOS1_kr2" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Assets\alertEOS1_3.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="alerta1EOS2_3" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="alerta1EOS2_kr2" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Assets\alertEOS2_10.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="alerta1EOS2_10" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="alerta1EOS2_kr1" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Assets\alertEOS2_3.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="background" type="System.Resources.ResXFileRef, System.Windows.Forms">

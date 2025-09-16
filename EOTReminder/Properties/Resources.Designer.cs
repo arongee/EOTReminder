@@ -63,36 +63,36 @@ namespace EOTReminder.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alerta1EOS2_10 {
+        internal static System.IO.UnmanagedMemoryStream alerta1EOS2_kr1 {
             get {
-                return ResourceManager.GetStream("alerta1EOS2_10", resourceCulture);
+                return ResourceManager.GetStream("alerta1EOS2_kr1", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alerta1EOS2_3 {
+        internal static System.IO.UnmanagedMemoryStream alerta1EOS2_kr2 {
             get {
-                return ResourceManager.GetStream("alerta1EOS2_3", resourceCulture);
+                return ResourceManager.GetStream("alerta1EOS2_kr2", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alerta2EOS1_10 {
+        internal static System.IO.UnmanagedMemoryStream alerta2EOS1_kr1 {
             get {
-                return ResourceManager.GetStream("alerta2EOS1_10", resourceCulture);
+                return ResourceManager.GetStream("alerta2EOS1_kr1", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
         /// </summary>
-        internal static System.IO.UnmanagedMemoryStream alerta2EOS1_3 {
+        internal static System.IO.UnmanagedMemoryStream alerta2EOS1_kr2 {
             get {
-                return ResourceManager.GetStream("alerta2EOS1_3", resourceCulture);
+                return ResourceManager.GetStream("alerta2EOS1_kr2", resourceCulture);
             }
         }
         

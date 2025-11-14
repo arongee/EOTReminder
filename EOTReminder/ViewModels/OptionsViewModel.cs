@@ -229,6 +229,9 @@ namespace EOTReminder.ViewModels
             Properties.Settings.Default.AlertOnShabbos = AlertOnShabbos;
 
             Properties.Settings.Default.Save();
+            ((MainViewModel)Application.Current.MainWindow.DataContext).SetSettingsProperties();
+            ((MainViewModel)Application.Current.MainWindow.DataContext).SetSunSetFields();
+
             Logger.LogInfo("Application settings saved successfully.");
 
             if (parameter is Window window)

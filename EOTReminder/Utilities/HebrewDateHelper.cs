@@ -54,6 +54,12 @@ public static class HebrewDateHelper
             DateTime.Today.DayOfWeek == DayOfWeek.Saturday;
     }
 
+    public static bool IsErevShabbosOrYomTov(DateTime gregorianDate)
+    {
+        DateTime today = gregorianDate;
+        DateTime nextDay = gregorianDate.AddDays(1);
+        return today.DayOfWeek == DayOfWeek.Friday && !IsYomTov(gregorianDate) || IsYomTov(nextDay) && !IsYomTov(gregorianDate);
+    }
     private static int MapToTorahMonth(int civilMonth, int year)
     {
         // Civil months: Tishrei=1, Cheshvan=2, ..., Elul=12 (Adar I=6, Adar II=7 in leap year)

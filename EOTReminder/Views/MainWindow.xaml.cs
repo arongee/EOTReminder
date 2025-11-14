@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using EOTReminder.Utilities;
 using EOTReminder.ViewModels;
 using WorkspaceTask;
 
@@ -15,6 +16,9 @@ namespace EOTReminder.Views
 
         public MainWindow()
         {
+            Logger.LogInfo("");
+            Logger.LogInfo("-----------------------------");
+            Logger.LogInfo("MainWindow initialized.\n");
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
            // _viewModel.InitializeData();

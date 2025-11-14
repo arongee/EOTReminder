@@ -9,10 +9,13 @@
         WindowStartupLocation="CenterScreen"
         WindowStyle="ToolWindow"
         ResizeMode="NoResize">
-        <Window.DataContext>
+    <Window.DataContext>
             <vm:OptionsViewModel/>
-        </Window.DataContext>
-        <Grid Margin="15">
+    </Window.DataContext>
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+    <Grid Margin="15">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <!-- Excel File Path -->

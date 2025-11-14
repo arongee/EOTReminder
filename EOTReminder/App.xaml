@@ -4,7 +4,9 @@
              xmlns:local="clr-namespace:EOTReminder"
              xmlns:conv="clr-namespace:EOTReminder.Converters"
              StartupUri="Views/MainWindow.xaml">
+    
     <Application.Resources>
+      
         <conv:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
 
@@ -24,4 +26,5 @@
         </Style>
 
     </Application.Resources>
+
 </Application>

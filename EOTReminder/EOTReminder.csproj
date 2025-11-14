@@ -102,6 +102,7 @@
     <Compile Include="Utilities\Globals.cs" />
     <Compile Include="Utilities\HebrewDateHelper.cs" />
     <Compile Include="Utilities\Logger.cs" />
+    <Compile Include="Utilities\SlideshowImage.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
     <Compile Include="ViewModels\OptionsViewModel.cs" />
     <Compile Include="Views\OptionsWindow.xaml.cs">

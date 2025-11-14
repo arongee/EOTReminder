@@ -47,5 +47,44 @@
     <Setting Name="EOT2SecondAlertPath" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="SunSetTenMin" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="SunSetThreeMin" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="SunSet" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="SunSetTenPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SunSetThreePath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SunSetPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SlideshowActivationIntervalSeconds" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">300</Value>
+    </Setting>
+    <Setting Name="SlideshowReturnIntervalSeconds" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">60</Value>
+    </Setting>
+    <Setting Name="SlideshowImageDisplaySeconds" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">3</Value>
+    </Setting>
+    <Setting Name="SlideshowTransitionType" Type="System.String" Scope="User">
+      <Value Profile="(Default)">"Fade"</Value>
+    </Setting>
+    <Setting Name="SlideshowImagesFolder" Type="System.String" Scope="User">
+      <Value Profile="(Default)">""</Value>
+    </Setting>
+    <Setting Name="SlideshowHeaderText" Type="System.String" Scope="User">
+      <Value Profile="(Default)">"Welcome — Slideshow"</Value>
+    </Setting>
+    <Setting Name="SlideshowEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

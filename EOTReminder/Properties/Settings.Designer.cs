@@ -202,5 +202,161 @@ namespace EOTReminder.Properties {
                 this["EOT2SecondAlertPath"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SunSetTenMin {
+            get {
+                return ((bool)(this["SunSetTenMin"]));
+            }
+            set {
+                this["SunSetTenMin"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SunSetThreeMin {
+            get {
+                return ((bool)(this["SunSetThreeMin"]));
+            }
+            set {
+                this["SunSetThreeMin"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SunSet {
+            get {
+                return ((bool)(this["SunSet"]));
+            }
+            set {
+                this["SunSet"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SunSetTenPath {
+            get {
+                return ((string)(this["SunSetTenPath"]));
+            }
+            set {
+                this["SunSetTenPath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SunSetThreePath {
+            get {
+                return ((string)(this["SunSetThreePath"]));
+            }
+            set {
+                this["SunSetThreePath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SunSetPath {
+            get {
+                return ((string)(this["SunSetPath"]));
+            }
+            set {
+                this["SunSetPath"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("300")]
+        public int SlideshowActivationIntervalSeconds {
+            get {
+                return ((int)(this["SlideshowActivationIntervalSeconds"]));
+            }
+            set {
+                this["SlideshowActivationIntervalSeconds"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("60")]
+        public int SlideshowReturnIntervalSeconds {
+            get {
+                return ((int)(this["SlideshowReturnIntervalSeconds"]));
+            }
+            set {
+                this["SlideshowReturnIntervalSeconds"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int SlideshowImageDisplaySeconds {
+            get {
+                return ((int)(this["SlideshowImageDisplaySeconds"]));
+            }
+            set {
+                this["SlideshowImageDisplaySeconds"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("\"Fade\"")]
+        public string SlideshowTransitionType {
+            get {
+                return ((string)(this["SlideshowTransitionType"]));
+            }
+            set {
+                this["SlideshowTransitionType"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("\"\"")]
+        public string SlideshowImagesFolder {
+            get {
+                return ((string)(this["SlideshowImagesFolder"]));
+            }
+            set {
+                this["SlideshowImagesFolder"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("\"Welcome — Slideshow\"")]
+        public string SlideshowHeaderText {
+            get {
+                return ((string)(this["SlideshowHeaderText"]));
+            }
+            set {
+                this["SlideshowHeaderText"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool SlideshowEnabled {
+            get {
+                return ((bool)(this["SlideshowEnabled"]));
+            }
+            set {
+                this["SlideshowEnabled"] = value;
+            }
+        }
     }
 }

@@ -1,0 +1,27 @@
+﻿<Application x:Class="EOTReminder.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:EOTReminder"
+             xmlns:conv="clr-namespace:EOTReminder.Converters"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <conv:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+
+        <!-- Define Font Families -->
+        <FontFamily x:Key="AlphaRegular">pack://application:,,,/Fonts/#Alpha Regular</FontFamily>
+        <FontFamily x:Key="AlphaBold">pack://application:,,,/Fonts/#Alpha Bold</FontFamily>
+
+        <!-- Default TextBlock style (regular) -->
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AlphaRegular}" />
+        </Style>
+
+        <!-- Optional: Bold style for special use -->
+        <Style x:Key="BoldTextBlock" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AlphaBold}" />
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+    </Application.Resources>
+</Application>

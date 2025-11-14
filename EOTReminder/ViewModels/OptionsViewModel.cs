@@ -43,7 +43,7 @@ namespace EOTReminder.ViewModels
             set { _excelFilePath = value; OnPropertyChanged(); }
         }
 
-        // NEW: Audio Alert Paths
+        // NEW: Audio Alert Paths (existing ones preserved)
         private string _eos1FirstAlertPath;
         public string EOS1FirstAlertPath
         {
@@ -155,7 +155,82 @@ namespace EOTReminder.ViewModels
                 Properties.Settings.Default.Save();
             }
         }
-        
+
+        // -------------------------
+        // NEW: SUNSET FIELDS (keep names consistent)
+        // -------------------------
+        private bool _runSunset1;
+        public bool RunSunset1
+        {
+            get => _runSunset1;
+            set
+            {
+                _runSunset1 = value; OnPropertyChanged();
+                Properties.Settings.Default.SunSetTenMin = value;
+                Properties.Settings.Default.Save();
+            }
+        }
+
+        private bool _runSunset2;
+        public bool RunSunset2
+        {
+            get => _runSunset2;
+            set
+            {
+                _runSunset2 = value; OnPropertyChanged();
+                Properties.Settings.Default.SunSetThreeMin = value;
+                Properties.Settings.Default.Save();
+            }
+        }
+
+        private bool _runSunset3;
+        public bool RunSunset3
+        {
+            get => _runSunset3;
+            set
+            {
+                _runSunset3 = value; OnPropertyChanged();
+                Properties.Settings.Default.SunSet = value;
+                Properties.Settings.Default.Save();
+            }
+        }
+
+        private string _sunset1Path;
+        public string Sunset1Path
+        {
+            get => _sunset1Path;
+            set
+            {
+                _sunset1Path = value; OnPropertyChanged();
+                Properties.Settings.Default.SunSetTenPath = value;
+                Properties.Settings.Default.Save();
+            }
+        }
+
+        private string _sunset2Path;
+        public string Sunset2Path
+        {
+            get => _sunset2Path;
+            set
+            {
+                _sunset2Path = value; OnPropertyChanged();
+                Properties.Settings.Default.SunSetThreePath = value;
+                Properties.Settings.Default.Save();
+            }
+        }
+
+        private string _sunset3Path;
+        public string Sunset3Path
+        {
+            get => _sunset3Path;
+            set
+            {
+                _sunset3Path = value; OnPropertyChanged();
+                Properties.Settings.Default.SunSetPath = value;
+                Properties.Settings.Default.Save();
+            }
+        }
+
         // Commands
         public ICommand MakeWindowResizableCommand { get; }
         public ICommand SaveSettingsCommand { get; }
@@ -172,6 +247,11 @@ namespace EOTReminder.ViewModels
         public ICommand BrowseEOT2FirstAlertCommand { get; }
         public ICommand BrowseEOT2SecondAlertCommand { get; }
 
+        // NEW: Sunset browse commands (added only, names preserved)
+        public ICommand BrowseSunset1Command { get; }
+        public ICommand BrowseSunset2Command { get; }
+        public ICommand BrowseSunset3Command { get; }
+
 
         public OptionsViewModel()
         {
@@ -182,7 +262,8 @@ namespace EOTReminder.ViewModels
             CloseSettingsCommand = new RelayCommand(CloseSettings); // Initialize new command
             BrowseExcelCommand = new RelayCommand(BrowseExcelFile);
             MakeWindowResizableCommand = new RelayCommand(MakeWindowResizable);
-            // NEW: Initialize Browse Commands for Audio Paths
+
+            // NEW: Initialize Browse Commands for Audio Paths (use same property names as above)
             BrowseEOS1FirstAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOS1FirstAlertPath)));
             BrowseEOS1SecondAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOS1SecondAlertPath)));
             BrowseEOS2FirstAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOS2FirstAlertPath)));
@@ -191,6 +272,11 @@ namespace EOTReminder.ViewModels
             BrowseEOT1SecondAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOT1SecondAlertPath)));
             BrowseEOT2FirstAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOT2FirstAlertPath)));
             BrowseEOT2SecondAlertCommand = new RelayCommand(param => BrowseAudioFile(nameof(EOT2SecondAlertPath)));
+
+            // NEW: Initialize Sunset browse commands
+            BrowseSunset1Command = new RelayCommand(param => BrowseAudioFile(nameof(Sunset1Path)));
+            BrowseSunset2Command = new RelayCommand(param => BrowseAudioFile(nameof(Sunset2Path)));
+            BrowseSunset3Command = new RelayCommand(param => BrowseAudioFile(nameof(Sunset3Path)));
         }
 
         private void LoadSettings()
@@ -199,13 +285,23 @@ namespace EOTReminder.ViewModels
             SecondAlertMinutes = Properties.Settings.Default.SecondAlertMinutes;
             ExcelFilePath = Properties.Settings.Default.ExcelFilePath;
 
-            // NEW: Load new settings
+            // NEW: Load new settings (existing preserved)
             EOS1FirstAlertPath = Properties.Settings.Default.EOS1FirstAlertPath;
             EOS1SecondAlertPath = Properties.Settings.Default.EOS1SecondAlertPath;
             EOS2FirstAlertPath = Properties.Settings.Default.EOS2FirstAlertPath;
             EOS2SecondAlertPath = Properties.Settings.Default.EOS2SecondAlertPath;
+            EOT2FirstAlertPath = Properties.Settings.Default.EOT2FirstAlertPath;
+            EOT2SecondAlertPath = Properties.Settings.Default.EOT2SecondAlertPath;
             VisualAlertMinutes = Properties.Settings.Default.VisualAlertMinutes;
             AlertOnShabbos = Properties.Settings.Default.AlertOnShabbos;
+
+            // NEW: Load sunset settings
+            RunSunset1 = Properties.Settings.Default.SunSetTenMin;
+            RunSunset2 = Properties.Settings.Default.SunSetThreeMin;
+            RunSunset3 = Properties.Settings.Default.SunSet;
+            Sunset1Path = Properties.Settings.Default.SunSetTenPath;
+            Sunset2Path = Properties.Settings.Default.SunSetThreePath;
+            Sunset3Path = Properties.Settings.Default.SunSetPath;
 
             Logger.LogInfo("Application settings loaded.");
         }
@@ -216,17 +312,25 @@ namespace EOTReminder.ViewModels
             Properties.Settings.Default.SecondAlertMinutes = SecondAlertMinutes;
             Properties.Settings.Default.ExcelFilePath = ExcelFilePath;
 
-            // NEW: Save new settings
+            // NEW: Save new settings (existing names preserved)
             Properties.Settings.Default.EOS1FirstAlertPath = EOS1FirstAlertPath;
             Properties.Settings.Default.EOS1SecondAlertPath = EOS1SecondAlertPath;
             Properties.Settings.Default.EOS2FirstAlertPath = EOS2FirstAlertPath;
             Properties.Settings.Default.EOS2SecondAlertPath = EOS2SecondAlertPath;
-            // Properties.Settings.Default.EOT1FirstAlertPath = EOT1FirstAlertPath;
-            // Properties.Settings.Default.EOT1SecondAlertPath = EOT1SecondAlertPath;
-            // Properties.Settings.Default.EOT2FirstAlertPath = EOT2FirstAlertPath;
-            // Properties.Settings.Default.EOT2SecondAlertPath = EOT2SecondAlertPath;
+            //Properties.Settings.Default.EOT1FirstAlertPath = EOT1FirstAlertPath;
+            //Properties.Settings.Default.EOT1SecondAlertPath = EOT1SecondAlertPath;
+            Properties.Settings.Default.EOT2FirstAlertPath = EOT2FirstAlertPath;
+            Properties.Settings.Default.EOT2SecondAlertPath = EOT2SecondAlertPath;
             Properties.Settings.Default.VisualAlertMinutes = VisualAlertMinutes;
             Properties.Settings.Default.AlertOnShabbos = AlertOnShabbos;
+
+            // NEW: Save sunset settings
+            Properties.Settings.Default.SunSetTenMin = RunSunset1;
+            Properties.Settings.Default.SunSetThreeMin = RunSunset2;
+            Properties.Settings.Default.SunSet = RunSunset3;
+            Properties.Settings.Default.SunSetTenPath = Sunset1Path;
+            Properties.Settings.Default.SunSetThreePath = Sunset2Path;
+            Properties.Settings.Default.SunSetPath = Sunset3Path;
 
             Properties.Settings.Default.Save();
             ((MainViewModel)Application.Current.MainWindow.DataContext).SetSettingsProperties();
@@ -291,7 +395,7 @@ namespace EOTReminder.ViewModels
             }
         }
 
-        // NEW: Generic BrowseAudioFile method
+        // NEW: Generic BrowseAudioFile method (used by all audio browse commands)
         private void BrowseAudioFile(string propertyName)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
@@ -338,6 +442,8 @@ namespace EOTReminder.ViewModels
         private void SetPropertyValue(string propertyName, object value)
         {
             GetType().GetProperty(propertyName)?.SetValue(this, value);
+            // notify property changed for propertyName so UI updates when using SetPropertyValue
+            OnPropertyChanged(propertyName);
         }
 
         private void MakeWindowResizable(object parameter)
@@ -387,6 +493,6 @@ namespace EOTReminder.ViewModels
             add => CommandManager.RequerySuggested += value;
             remove => CommandManager.RequerySuggested -= value;
         }
-   
+
     }
 }

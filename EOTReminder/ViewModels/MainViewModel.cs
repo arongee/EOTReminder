@@ -144,6 +144,7 @@ namespace EOTReminder.ViewModels
             try
             {
                 SetSettingsProperties();
+
                 _timer = new Timer(1000); // Tick every 1 second
                 _timer.Elapsed += (s, e) =>
                 {
@@ -153,163 +154,25 @@ namespace EOTReminder.ViewModels
 
                         Application.Current.Dispatcher.Invoke(() => // Ensure UI updates happen on the UI thread
                         {
-                            foreach (var slot in TimeSlots)
-                            {
-                                slot.Countdown = slot.Time - DateTime.Now; // Update countdown
+                            Logger.LogInfo("invoked Dispatcher");
 
-                                if (!slot.IsPassed && slot.Countdown <= TimeSpan.Zero)
-                                {
-                                    // Time has just passed
-                                    slot.Highlight = false;
-                                    slot.IsPassed = true;
-                                    slot.CountdownText = ""; // Clear countdown
-                                    slot.ShowSandClock = false;
-                                    slot.IsIn30MinAlert = false; // Reset alert state
-                                                                 // Reset alert flags for this slot
-                                    slot.AlertFlags[Globals.Visual] = false;
-                                    slot.AlertFlags[Globals.Shema1] = false;
-                                    slot.AlertFlags[Globals.Shema2] = false;
-                                    slot.AlertFlags[Globals.Tefila2] = false;
+                            hasChanged = SlotsInvokedUpdates();
 
-                                    IsAlertActive = false;
-                                    hasChanged = true;
-                                }
-                                else if (!slot.IsPassed)
-                                {
+                            SunsetInvokedUpdates();
 
-                                    // Update countdown text for all active slots
-                                    slot.CountdownText = string.Format("{0:D2}:{1:D2}",
-                                        (int)Math.Floor(slot.Countdown.TotalMinutes),
-                                        slot.Countdown.Seconds);
+                            SetDateInterval();
 
-                                    // Time is still upcoming
-                                    if (slot.Countdown.TotalMinutes <= visualAlertMin && !slot.AlertFlags[Globals.Visual])
-                                    {
-                                        IsAlertActive = true;
-                                        // 30-minute alert trigger
-                                        slot.IsIn30MinAlert = true; // This will trigger the UI layout change
-                                        slot.Highlight = true;
-                                        slot.ShowSandClock = true;
-                                        slot.AlertFlags[Globals.Visual] = true;
-                                        // No MessageBox for 30min visual alert, just the UI change
-                                        hasChanged = true;
-                                    }
-                                    else if (slot.Countdown.TotalMinutes > visualAlertMin && slot.AlertFlags[Globals.Visual])
-                                    {
-                                        IsAlertActive = false;
-                                        // If it was in 30min alert but now it's outside, reset
-                                        slot.IsIn30MinAlert = false;
-                                        slot.Highlight = false;
-                                        slot.ShowSandClock = false;
-                                        slot.AlertFlags[Globals.Visual] = false; // Allow re-trigger if time is reset/reloaded
-                                        hasChanged = true;
-                                    }
-                                    else if (slot.Countdown.TotalMinutes >= visualAlertMin &&
-                                            slot.Countdown.TotalMinutes <= visualAlertMin + 1)
-                                        hasChanged = true;
-
-                                    if (!HebrewDateHelper.IsYomTov(DateTime.Today) || Properties.Settings.Default.AlertOnShabbos)
-                                    {
-                                        // Use settings for alert thresholds
-                                        if (firstAlertMin > 0 &&
-                                            slot.Countdown.TotalMinutes <= firstAlertMin &&
-                                            slot.Countdown.TotalMinutes > (firstAlertMin - 1) && // Ensure it fires once per minute
-                                            !slot.AlertFlags[Globals.Shema1])
-                                        {
-
-                                            PlayAlert(slot.Id, Globals.Shema1); // Still pass "10" to choose the WAV file
-                                            slot.AlertFlags[Globals.Shema1] = true;
-                                            hasChanged = true;
-                                        }
-
-                                        if (secondAlertMin > 0 &&
-                                            slot.Countdown.TotalMinutes <= secondAlertMin &&
-                                            slot.Countdown.TotalMinutes > (secondAlertMin - 1) && // Ensure it fires once per minute
-                                            !slot.AlertFlags[Globals.Shema2])
-                                        {
-
-                                            PlayAlert(slot.Id, Globals.Shema2); // Still pass "3" to choose the WAV file
-                                            slot.AlertFlags[Globals.Shema2] = true;
-                                            hasChanged = true;
-                                        }
-
-                                        if (secondTAlertMin > 0 &&
-                                            slot.Countdown.TotalMinutes <= secondTAlertMin &&
-                                            slot.Countdown.TotalMinutes > (secondTAlertMin - 1) && // Ensure it fires once per minute
-                                            !slot.AlertFlags[Globals.Tefila2] && (slot.Id == "b2EOT1" || slot.Id == "b1EOT2"))
-                                        {
-                                            PlayAlert(slot.Id, Globals.Tefila2); // Still pass "30" to choose the WAV file
-                                            slot.AlertFlags[Globals.Tefila2] = true;
-                                        }
-
-
-                                    }
-                                }
-                           
-                            }
-
-                            if (DateTime.Now <= _internalSunsetTime.AddMinutes(11) && DateTime.Now >= _internalSunsetTime)
-                            {
-                                if (DateTime.Now <= _internalSunsetTime.AddSeconds((10 * 60) + 15) && !TenMinSunSet && SunSet10Alert)
-                                {
-                                    PlayAlert(Globals.SuS, Globals.Sunset10);
-                                    TenMinSunSet = true;
-                                }
-                                else if (DateTime.Now <= _internalSunsetTime.AddSeconds((3 * 60) + 15) && !ThreeMinSunSet && SunSet3Alert)
-                                {
-                                    PlayAlert(Globals.SuS, Globals.Sunset3);
-                                    ThreeMinSunSet = true;
-                                }
-                                else if (DateTime.Now <= _internalSunsetTime.AddSeconds(15) && !SunSet && SunSetAlert)
-                                {
-                                    PlayAlert(Globals.SuS, Globals.Sunset3);
-                                    SunSet = true;
-                                }
-                            }
-
-                            // Step 1: Ensure _internalSunriseTime is always updated for the current Gregorian day.
-                            // This is crucial if the application runs continuously past midnight,
-                            // as _internalSunriseTime would otherwise remain from the previous day.
-                            if (_internalSunriseTime.Date != DateTime.Today && _hasReloadedForCurrentSunriseCycle)
-                            {
-                                Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
-                                // It's a new Gregorian day, or _internalSunriseTime hasn't been updated for today yet.
-                                // Reload Excel data to get the correct sunrise time for today.
-                                _hasReloadedForCurrentSunriseCycle = false; // Reset the flag for the new day's cycle
-
-                                // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
-                                // Step 2: Calculate the specific reload trigger time for today's sunrise.
-                                TimeSpan timeOnly = new TimeSpan(0, 05, 0);
-                                _reloadTriggerTime = DateTime.Today.Add(timeOnly);
-
-                                //_reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
-
-                                // Step 3: Check if it's time to perform the scheduled daily reload.
-                                // This condition ensures:
-                                // 1. The current time is past the calculated trigger time.
-                                // 2. We haven't already reloaded for *this specific sunrise cycle*.
-                                //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
-                                Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {_reloadTriggerTime:HH:mm:ss}");
-                                LoadFromExcel(); // Perform the actual scheduled reload
-                                _hasReloadedForCurrentSunriseCycle = true; // Mark that reload has happened for this cycle
-                            }
+                            OnPropertyChanged(nameof(CurrentTime));
 
                             IsAlertNotActive = !IsAlertActive;
                             if(hasChanged)
                                 UpdateSlotCollections(); // Update the TopSlots/BottomSlots based on alert state
-                            OnPropertyChanged(nameof(CurrentTime)); // Update current time in footer
-                                                                    // HebrewDate update is less frequent, can be done daily or on language switch
-                                                                    // OnPropertyChanged(nameof(HebrewDate)); // Uncomment if you want it to refresh every second
-                        });
+                           });
 
                     }
                     catch (Exception ex)
                     {
                         Logger.LogError($"Error In Inner catch - occured while running the main timer thread. exception: {ex.Message}. inner exception: {ex.InnerException}");
-                    }
-                    finally
-                    {
-                        Logger.LogError($"Error In finally - occured while running the main timer thread.");
                     }
                 };
                 _timer.Start();
@@ -508,7 +371,7 @@ namespace EOTReminder.ViewModels
             firstAlertMin   = Properties.Settings.Default.FirstAlertMinutes;
             secondAlertMin  = Properties.Settings.Default.SecondAlertMinutes;
             firstTAlertMin  = Properties.Settings.Default.FirstAlertTefilaMinutes;
-            secondTAlertMin  = Properties.Settings.Default.SecondAlertTefilaMinutes;
+            secondTAlertMin  = 30;
 
             SunSet10Alert = Properties.Settings.Default.SunSetTenMin;
             SunSet3Alert = Properties.Settings.Default.SunSetThreeMin;
@@ -520,6 +383,168 @@ namespace EOTReminder.ViewModels
             TenMinSunSet = false;
             ThreeMinSunSet = false;
             SunSet = false;
+        }
+
+        private bool SlotsInvokedUpdates()
+        {
+            bool hasChanged = false;
+            try
+            {
+                foreach (var slot in TimeSlots)
+                {
+                    slot.Countdown = slot.Time - DateTime.Now; // Update countdown
+                    if (!slot.IsPassed && slot.Countdown <= TimeSpan.Zero)
+                    {
+                        // Time has just passed
+                        slot.Highlight = false;
+                        slot.IsPassed = true;
+                        slot.CountdownText = ""; // Clear countdown
+                        slot.ShowSandClock = false;
+                        slot.IsIn30MinAlert = false; // Reset alert state
+                                                     // Reset alert flags for this slot
+                        slot.AlertFlags[Globals.Visual] = false;
+                        slot.AlertFlags[Globals.Shema1] = false;
+                        slot.AlertFlags[Globals.Shema2] = false;
+                        slot.AlertFlags[Globals.Tefila2] = false;
+
+                        IsAlertActive = false;
+                        hasChanged = true;
+                    }
+                    else if (!slot.IsPassed)
+                    {
+                        // Update countdown text for all active slots
+                        slot.CountdownText = string.Format("{0:D2}:{1:D2}",
+                            (int)Math.Floor(slot.Countdown.TotalMinutes),
+                            slot.Countdown.Seconds);
+
+                        // Time is still upcoming
+                        if (slot.Countdown.TotalMinutes <= visualAlertMin && !slot.AlertFlags[Globals.Visual])
+                        {
+                            IsAlertActive = true;
+                            // 30-minute alert trigger
+                            slot.IsIn30MinAlert = true; // This will trigger the UI layout change
+                            slot.Highlight = true;
+                            slot.ShowSandClock = true;
+                            slot.AlertFlags[Globals.Visual] = true;
+                            // No MessageBox for 30min visual alert, just the UI change
+                            hasChanged = true;
+                        }
+                        else if (slot.Countdown.TotalMinutes > visualAlertMin && slot.AlertFlags[Globals.Visual])
+                        {
+                            IsAlertActive = false;
+                            // If it was in 30min alert but now it's outside, reset
+                            slot.IsIn30MinAlert = false;
+                            slot.Highlight = false;
+                            slot.ShowSandClock = false;
+                            slot.AlertFlags[Globals.Visual] = false; // Allow re-trigger if time is reset/reloaded
+                            hasChanged = true;
+                        }
+                        else if (slot.Countdown.TotalMinutes >= visualAlertMin &&
+                                slot.Countdown.TotalMinutes <= visualAlertMin + 1)
+                            hasChanged = true;
+
+                        if (!HebrewDateHelper.IsYomTov(DateTime.Today) || Properties.Settings.Default.AlertOnShabbos)
+                        {
+                            // Use settings for alert thresholds
+                            if (firstAlertMin > 0 &&
+                                slot.Countdown.TotalMinutes <= firstAlertMin &&
+                                slot.Countdown.TotalMinutes > (firstAlertMin - 1) && // Ensure it fires once per minute
+                                !slot.AlertFlags[Globals.Shema1])
+                            {
+                                PlayAlert(slot.Id, Globals.Shema1); // Still pass "10" to choose the WAV file
+                                slot.AlertFlags[Globals.Shema1] = true;
+                                hasChanged = true;
+                            }
+
+                            if (secondAlertMin > 0 &&
+                                slot.Countdown.TotalMinutes <= secondAlertMin &&
+                                slot.Countdown.TotalMinutes > (secondAlertMin - 1) && // Ensure it fires once per minute
+                                !slot.AlertFlags[Globals.Shema2])
+                            {
+                                PlayAlert(slot.Id, Globals.Shema2); // Still pass "3" to choose the WAV file
+                                slot.AlertFlags[Globals.Shema2] = true;
+                                hasChanged = true;
+                            }
+
+                            if (secondTAlertMin > 0 &&
+                                slot.Countdown.TotalMinutes <= secondTAlertMin &&
+                                slot.Countdown.TotalMinutes > (secondTAlertMin - 1) && // Ensure it fires once per minute
+                                !slot.AlertFlags[Globals.Tefila2] && (slot.Id == "b2EOT1" || slot.Id == "b1EOT2"))
+                            {
+                                PlayAlert(slot.Id, Globals.Tefila2); // Still pass "30" to choose the WAV file
+                                slot.AlertFlags[Globals.Tefila2] = true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error in SlotsInvokedUpdates: {ex.Message}");
+                throw;
+            }
+
+            return hasChanged;
+        }
+
+        private void SunsetInvokedUpdates()
+        {
+            if (!HebrewDateHelper.IsErevShabbosOrYomTov(DateTime.Today)) return;
+
+            var x = _internalSunsetTime.Subtract(TimeSpan.FromMinutes(11));
+            if (DateTime.Now >= x && DateTime.Now <= _internalSunsetTime)
+            {
+                if (DateTime.Now >= _internalSunsetTime.Subtract(TimeSpan.FromSeconds((10 * 60) + 15)) &&
+                    DateTime.Now <= _internalSunsetTime.Subtract(TimeSpan.FromSeconds(10 * 60)) &&
+                    !TenMinSunSet && SunSet10Alert)
+                {
+                    PlayAlert(Globals.SuS, Globals.Sunset10);
+                    TenMinSunSet = true;
+                }
+                else if (DateTime.Now >= _internalSunsetTime.Subtract(TimeSpan.FromSeconds((3 * 60) + 15)) &&
+                    DateTime.Now <= _internalSunsetTime.Subtract(TimeSpan.FromSeconds(3 * 60)) &&
+                    !ThreeMinSunSet && SunSet3Alert)
+                {
+                    PlayAlert(Globals.SuS, Globals.Sunset3);
+                    ThreeMinSunSet = true;
+                }
+                else if (DateTime.Now >= _internalSunsetTime.Subtract(TimeSpan.FromSeconds(15)) &&
+                    DateTime.Now <= _internalSunsetTime && !SunSet && SunSetAlert)
+                {
+                    PlayAlert(Globals.SuS, Globals.Sunset3);
+                    SunSet = true;
+                }
+            }
+        }
+
+        private void SetDateInterval()
+        {
+            // Step 1: Ensure _internalSunriseTime is always updated for the current Gregorian day.
+            // This is crucial if the application runs continuously past midnight,
+            // as _internalSunriseTime would otherwise remain from the previous day.
+            if (_internalSunriseTime.Date != DateTime.Today && _hasReloadedForCurrentSunriseCycle)
+            {
+                Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
+                // It's a new Gregorian day, or _internalSunriseTime hasn't been updated for today yet.
+                // Reload Excel data to get the correct sunrise time for today.
+                _hasReloadedForCurrentSunriseCycle = false; // Reset the flag for the new day's cycle
+
+                // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
+                // Step 2: Calculate the specific reload trigger time for today's sunrise.
+                TimeSpan timeOnly = new TimeSpan(0, 05, 0);
+                _reloadTriggerTime = DateTime.Today.Add(timeOnly);
+
+                //_reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
+
+                // Step 3: Check if it's time to perform the scheduled daily reload.
+                // This condition ensures:
+                // 1. The current time is past the calculated trigger time.
+                // 2. We haven't already reloaded for *this specific sunrise cycle*.
+                //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
+                Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {_reloadTriggerTime:HH:mm:ss}");
+                LoadFromExcel(); // Perform the actual scheduled reload
+                _hasReloadedForCurrentSunriseCycle = true; // Mark that reload has happened for this cycle
+            }
         }
 
         private void LoadMock()
@@ -572,6 +597,7 @@ namespace EOTReminder.ViewModels
             // Option 1: Play from embedded resource (preferred)
             string fileName = String.Empty;
             string extFileName = String.Empty;
+            bool hasCustomAlert = true;
 
             if (slotId == Globals.EOS1)
             {
@@ -579,6 +605,7 @@ namespace EOTReminder.ViewModels
                     extFileName = Properties.Settings.Default.EOS1FirstAlertPath;
                 else if (alertFlag == Globals.Shema2 && !string.IsNullOrEmpty(Properties.Settings.Default.EOS1SecondAlertPath))
                     extFileName = Properties.Settings.Default.EOS1SecondAlertPath;
+                else hasCustomAlert = false;
             }
             else if (slotId == Globals.EOS2)
             {
@@ -586,11 +613,17 @@ namespace EOTReminder.ViewModels
                     extFileName = Properties.Settings.Default.EOS2FirstAlertPath;
                 else if (alertFlag == Globals.Shema2 && !string.IsNullOrEmpty(Properties.Settings.Default.EOS2SecondAlertPath))
                     extFileName = Properties.Settings.Default.EOS2SecondAlertPath;
+                else hasCustomAlert = false;
             }
-            else if (slotId == Globals.EOT2 &&
+            else hasCustomAlert = false;
+
+            if (slotId == Globals.EOT2 &&
                 alertFlag == Globals.Tefila2 &&
                 !string.IsNullOrEmpty(Properties.Settings.Default.EOT2FirstAlertPath))
+            {
+                hasCustomAlert = true;
                 extFileName = Properties.Settings.Default.EOT2FirstAlertPath;
+            }
             else if (slotId == Globals.SuS)
             {
                 if (alertFlag == Globals.Sunset10 && Properties.Settings.Default.SunSetTenMin)
@@ -599,9 +632,15 @@ namespace EOTReminder.ViewModels
                     extFileName = Properties.Settings.Default.SunSetThreePath;
                 else if (alertFlag == Globals.Sunset && Properties.Settings.Default.SunSet)
                     extFileName = Properties.Settings.Default.SunSetPath;
+                else return;
+
+                    hasCustomAlert = true;
             }
-            else
+            
+
+            if(!hasCustomAlert)
                 fileName = $"alert{slotId}_{alertFlag}.wav";
+
             try
             {
                 SoundPlayer player = null;
@@ -624,15 +663,16 @@ namespace EOTReminder.ViewModels
                 }
                 else
                 {
-                    Logger.LogWarning($"Resource not found in Resources.resx. and settings not set for {slotId} alert {alertFlag}");
+                    Logger.LogWarning($"Resource not found in Resources.resx. " +
+                        $"and settings not set for {slotId} alert {alertFlag}");
                     return;
                 }
                 Logger.LogInfo($"Playing allert for {slotId} alert {alertFlag}");
-                player.Play();
+                player?.Play();
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Error playing embedded sound: {ex.Message}");
+                Logger.LogError($"Error playing embedded sound for file {extFileName} Error: {ex.Message}");
             }
         }
 
